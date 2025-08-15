@@ -26,13 +26,10 @@ ask_yn() {
 echo "Installing grub-btrfs..."
 sudo pacman -S --noconfirm grub-btrfs
 
-GRUB_BTRFS_OVERRIDE_DIR="/etc/systemd/system/grub-btrfsd.service.d"
-sudo mkdir -p "$GRUB_BTRFS_OVERRIDE_DIR"
-sudo tee "$GRUB_BTRFS_OVERRIDE_DIR/override.conf" >/dev/null <<EOF
-[Service]
-ExecStart=
-ExecStart=/usr/bin/grub-btrfsd --timeshift-auto
-EOF
+# Replace systemd service file fully to use Timeshift
+echo "Configuring grub-btrfsd to use Timeshift..."
+cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
+sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now grub-btrfsd.service
