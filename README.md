@@ -4,4 +4,4 @@
 
 - To run this script, use wget (install using sudo pacman -S wget):
   
-```wget -qO - https://raw.githubusercontent.com/FatihTheDev/archlinux-post-install/main/archsetup.sh | bash```
+  ```sudo wget -qO - https://raw.githubusercontent.com/FatihTheDev/archlinux-post-install/main/archsetup.sh | bash```
