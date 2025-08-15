@@ -1,0 +1,1 @@
+# archlinux-post-install
