@@ -51,6 +51,7 @@ EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now reflector.service
+sudo systemctl enable --now reflector.timer
 
 ### 3. Add Chaotic AUR ###
 echo "Adding Chaotic AUR..."
