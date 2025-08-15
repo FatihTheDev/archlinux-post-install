@@ -7,4 +7,5 @@
   ```sudo wget -qO - https://raw.githubusercontent.com/FatihTheDev/archlinux-post-install/main/archsetup.sh | bash```
 
   - Or clone the repo and run the script directly:
+    
   ```git clone https://github.com/FatihTheDev/archlinux-post-install.git && sudo chmod +x archsetup.sh && ./archsetup.sh```  
