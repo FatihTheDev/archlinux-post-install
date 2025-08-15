@@ -29,7 +29,7 @@ sudo pacman -S --noconfirm grub-btrfs
 # Replace systemd service file fully to use Timeshift
 echo "Configuring grub-btrfsd to use Timeshift..."
 cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
-sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
+sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now grub-btrfsd.service
