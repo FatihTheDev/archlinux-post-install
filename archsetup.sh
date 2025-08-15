@@ -1,21 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Ensure the script is run as root
-if [[ $EUID -ne 0 ]]; then
-    echo "Please run this script as root (use sudo)."
-    exit 1
-fi
-
-# Detect the real non-root user who invoked sudo
-if [[ -n "${SUDO_USER:-}" ]]; then
-    REAL_USER="$SUDO_USER"
-else
-    REAL_USER=$(logname 2>/dev/null || echo "$USER")
-fi
-
-REAL_HOME=$(eval echo "~$REAL_USER")
-
 echo "Updating system..."
 pacman -Syu --noconfirm
 
