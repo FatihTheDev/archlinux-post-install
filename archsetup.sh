@@ -1,10 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
+# Ensure the script is run as root
 if [[ $EUID -ne 0 ]]; then
-    echo "Please run this script as root."
+    echo "Please run this script as root (use sudo)."
     exit 1
 fi
+
+# Detect the real non-root user who invoked sudo
+if [[ -n "${SUDO_USER:-}" ]]; then
+    REAL_USER="$SUDO_USER"
+else
+    REAL_USER=$(logname 2>/dev/null || echo "$USER")
+fi
+
+REAL_HOME=$(eval echo "~$REAL_USER")
 
 echo "Updating system..."
 pacman -Syu --noconfirm
@@ -50,7 +60,7 @@ mkdir -p "$REFLECTOR_OVERRIDE_DIR"
 cat > "$REFLECTOR_OVERRIDE_DIR/override.conf" <<EOF
 [Service]
 ExecStart=
-ExecStart=/usr/bin/reflector --latest 10 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist
+ExecStart=/usr/bin/reflector --latest 15 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist
 EOF
 
 systemctl daemon-reload
@@ -77,7 +87,7 @@ if ! command -v git &> /dev/null; then
     pacman -S --noconfirm git base-devel
 fi
 
-sudo -u $(logname) bash <<'EOF'
+sudo -u "$REAL_USER" bash <<'EOF'
 cd /tmp
 git clone https://aur.archlinux.org/yay-bin.git
 cd yay-bin
@@ -89,16 +99,14 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     echo "Installing zsh, oh-my-zsh, starship..."
     pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
-    USER_NAME=$(logname)
-    USER_HOME=$(eval echo ~"$USER_NAME")
-    ZSHRC="$USER_HOME/.zshrc"
+    ZSHRC="$REAL_HOME/.zshrc"
 
     # Install oh-my-zsh for the user (unattended)
-    sudo -u "$USER_NAME" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    sudo -u "$REAL_USER" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 
     # Configure starship prompt for zsh
-    sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
-    sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
+    sudo -u "$REAL_USER" mkdir -p "$REAL_HOME/.config"
+    sudo -u "$REAL_USER" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
 
     # Enable zsh syntax highlighting
     echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" >> "$ZSHRC"
@@ -107,9 +115,9 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" >> "$ZSHRC"
 
     # Make zsh the default shell for the user
-    chsh -s /bin/zsh "$USER_NAME"
+    chsh -s /bin/zsh "$REAL_USER"
 
-    chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
+    chown "$REAL_USER":"$(id -gn "$REAL_USER")" "$ZSHRC"
 fi
 
 ### 6. Prompt for virtualization setup ###
@@ -130,7 +138,7 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     systemctl enable --now libvirtd.service virtlogd.service
 
     echo "Adding user to libvirt group..."
-    usermod -aG libvirt $(logname)
+    usermod -aG libvirt "$REAL_USER"
 
     echo "Autostarting default libvirt network..."
     virsh net-autostart default
