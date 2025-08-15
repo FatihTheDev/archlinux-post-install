@@ -46,12 +46,12 @@ sudo mkdir -p "$REFLECTOR_OVERRIDE_DIR"
 sudo tee "$REFLECTOR_OVERRIDE_DIR/override.conf" >/dev/null <<EOF
 [Service]
 ExecStart=
-ExecStart=/usr/bin/reflector --latest 15 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist
+ExecStart=/usr/bin/reflector --latest 10 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now reflector.service
 sudo systemctl enable --now reflector.timer
+sudo systemctl enable --now reflector.service
 
 ### 3. Add Chaotic AUR ###
 echo "Adding Chaotic AUR..."
