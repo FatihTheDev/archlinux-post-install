@@ -45,6 +45,7 @@ ExecStart=/usr/bin/reflector --latest 10 --sort rate --fastest 5 --save /etc/pac
 EOF
 
 sudo systemctl daemon-reload
+sudo systemctl enable --now reflector.timer
 sudo systemctl enable --now reflector.service
 
 ### 3. Add Chaotic AUR ###
