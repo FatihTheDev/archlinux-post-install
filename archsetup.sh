@@ -28,8 +28,8 @@ sudo pacman -S --noconfirm grub-btrfs
 
 # Replace systemd service file fully to use Timeshift
 echo "Configuring grub-btrfsd to use Timeshift..."
-cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
-sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
+sudo cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
+sudo sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now grub-btrfsd.service
@@ -98,6 +98,7 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
 
     echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC" >/dev/null
     echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$ZSHRC" >/dev/null
+    echo "alias update-grub='grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC" >/dev/null
 
     sudo chsh -s /bin/zsh "$REAL_USER"
     sudo chown "$REAL_USER":"$(id -gn "$REAL_USER")" "$ZSHRC"
