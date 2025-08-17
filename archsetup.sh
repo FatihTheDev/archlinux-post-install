@@ -22,8 +22,9 @@ ask_yn() {
 echo "Installing grub-btrfs..."
 sudo pacman -S --noconfirm grub-btrfs
 
+echo "Configuring grub-btrfsd to use Timeshift..."
 sudo cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
-sudo sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
+sudo sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now grub-btrfsd.service
@@ -61,6 +62,9 @@ Include = /etc/pacman.d/chaotic-mirrorlist
 EOF
 fi
 
+echo "Refreshing system repositories..."
+sudo pacman -Sy
+
 ### 4. Install yay-bin from source ###
 echo "Installing yay-bin..."
 if ! command -v git &> /dev/null; then
@@ -88,14 +92,35 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
 
     echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
-    echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$ZSHRC"
-    echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
+
+    echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$ZSHRC" 
+    echo "alias update-grub='grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
 
     chsh -s /bin/zsh "$USER_NAME"
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 fi
 
-### 6. Prompt for virtualization setup ###
+### 6. Kernel headers installation ###
+if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
+    current_kernel=$(uname -r)
+    base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
+    suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
+
+    if [[ "$suffix" == *"arch"* ]]; then
+        sudo pacman -S --noconfirm linux-headers
+    elif [[ "$suffix" == *"lts"* ]]; then
+        sudo pacman -S --noconfirm linux-lts-headers
+    elif [[ "$suffix" == *"zen"* ]]; then
+        sudo pacman -S --noconfirm linux-zen-headers
+    elif [[ "$suffix" == *"hardened"* ]]; then
+        sudo pacman -S --noconfirm linux-hardened-headers
+    else
+        echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
+        echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
+    fi
+fi
+
+### 7. Prompt for virtualization setup ###
 if ask_yn "Do you want to install virtualization support (libvirt, virt-manager, QEMU)?"; then
     while true; do
         read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice
@@ -117,26 +142,6 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
 
     echo "Autostarting default libvirt network..."
     sudo virsh net-autostart default
-fi
-
-### 7. Kernel headers installation ###
-if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
-    current_kernel=$(uname -r)
-    base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
-    suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
-
-    if [[ "$suffix" == *"arch"* ]]; then
-        sudo pacman -S --noconfirm linux-headers
-    elif [[ "$suffix" == *"lts"* ]]; then
-        sudo pacman -S --noconfirm linux-lts-headers
-    elif [[ "$suffix" == *"zen"* ]]; then
-        sudo pacman -S --noconfirm linux-zen-headers
-    elif [[ "$suffix" == *"hardened"* ]]; then
-        sudo pacman -S --noconfirm linux-hardened-headers
-    else
-        echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
-        echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
-    fi
 fi
 
 ### 8. Prompt for VLC and KDE Connect ###
