@@ -133,7 +133,7 @@ if ask_yn "Do you want to install kernel headers? (Needed for building kernel mo
     base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
     suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
 
-    if [[ "$suffix" == "arch1-1" ]]; then
+    if [[ "$suffix" == *"arch"* ]]; then
         sudo pacman -S --noconfirm linux-headers
     elif [[ "$suffix" == *"lts"* ]]; then
         sudo pacman -S --noconfirm linux-lts-headers
