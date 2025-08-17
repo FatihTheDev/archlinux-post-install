@@ -10,4 +10,4 @@
     
   ```git clone https://github.com/FatihTheDev/archlinux-post-install.git && sudo chmod +x archsetup.sh && ./archsetup.sh```
 
-  - **Important**: For additional gaming tweaks, visit https://github.com/FatihTheDev/archlinux-post-install/blob/main-gaming/README.md
+  - **Important**: For additional gaming tweaks(experimental), visit https://github.com/FatihTheDev/archlinux-post-install/blob/testing-gaming/README.md
