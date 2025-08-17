@@ -118,16 +118,7 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     sudo virsh net-autostart default
 fi
 
-### 7. Prompt for VLC and KDE Connect ###
-if ask_yn "Do you want to install VLC media player?"; then
-    sudo pacman -S --noconfirm vlc
-fi
-
-if ask_yn "Do you want to install KDE Connect?"; then
-    sudo pacman -S --noconfirm kdeconnect
-fi
-
-### 8. Kernel headers installation ###
+### 7. Kernel headers installation ###
 if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
     current_kernel=$(uname -r)
     base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
@@ -146,5 +137,15 @@ if ask_yn "Do you want to install kernel headers? (Needed for building kernel mo
         echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
     fi
 fi
+
+### 8. Prompt for VLC and KDE Connect ###
+if ask_yn "Do you want to install VLC media player?"; then
+    sudo pacman -S --noconfirm vlc
+fi
+
+if ask_yn "Do you want to install KDE Connect?"; then
+    sudo pacman -S --noconfirm kdeconnect
+fi
+
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
