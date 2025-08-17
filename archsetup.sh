@@ -127,7 +127,51 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     sudo virsh net-autostart default
 fi
 
-### 7. Prompt for VLC and KDE Connect ###
+### 7. Kernel headers installation ###
+if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
+    current_kernel=$(uname -r)
+    base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
+    suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
+
+    if [[ "$suffix" == *"arch"* ]]; then
+        sudo pacman -S --noconfirm linux-headers
+    elif [[ "$suffix" == *"lts"* ]]; then
+        sudo pacman -S --noconfirm linux-lts-headers
+    elif [[ "$suffix" == *"zen"* ]]; then
+        sudo pacman -S --noconfirm linux-zen-headers
+    elif [[ "$suffix" == *"hardened"* ]]; then
+        sudo pacman -S --noconfirm linux-hardened-headers
+    else
+        echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
+        echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
+    fi
+fi
+
+### 8. Gaming tweaks (CachyOS kernel, gaming meta packages, Proton-GE) ###
+echo "Adding CachyOS repositories..."
+sudo pacman-key --recv-key FBA220DFC880C036 --keyserver keyserver.ubuntu.com
+sudo pacman-key --lsign-key FBA220DFC880C036
+sudo pacman -U --noconfirm 'https://mirror.cachyos.org/cachyos/cachyos-keyring.pkg.tar.zst'
+sudo pacman -U --noconfirm 'https://mirror.cachyos.org/cachyos/cachyos-mirrorlist.pkg.tar.zst'
+
+if ! grep -q "\[cachyos\]" /etc/pacman.conf; then
+    cat <<'EOF' | sudo tee -a /etc/pacman.conf
+
+[cachyos]
+Include = /etc/pacman.d/cachyos-mirrorlist
+EOF
+fi
+
+echo "Refreshing repositories..."
+sudo pacman -Sy
+
+echo "Installing CachyOS kernel and gaming packages..."
+sudo pacman -S --noconfirm linux-cachyos linux-cachyos-headers cachyos-settings cachyos-gaming-meta
+
+echo "Installing Proton-GE (Chaotic AUR)..."
+sudo pacman -S --noconfirm proton-ge-custom-bin
+
+### 9. Prompt for VLC and KDE Connect ###
 if ask_yn "Do you want to install VLC media player?"; then
     sudo pacman -S --noconfirm vlc
 fi
