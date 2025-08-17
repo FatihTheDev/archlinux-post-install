@@ -149,19 +149,11 @@ if ask_yn "Do you want to install kernel headers? (Needed for building kernel mo
 fi
 
 ### 8. Gaming tweaks (CachyOS kernel, gaming meta packages, Proton-GE) ###
+##Link to CachyOS repos installation and removval: https://wiki.cachyos.org/features/optimized_repos/##
 echo "Adding CachyOS repositories..."
-sudo pacman-key --recv-key FBA220DFC880C036 --keyserver keyserver.ubuntu.com
-sudo pacman-key --lsign-key FBA220DFC880C036
-sudo pacman -U --noconfirm 'https://mirror.cachyos.org/cachyos/cachyos-keyring.pkg.tar.zst'
-sudo pacman -U --noconfirm 'https://mirror.cachyos.org/cachyos/cachyos-mirrorlist.pkg.tar.zst'
-
-if ! grep -q "\[cachyos\]" /etc/pacman.conf; then
-    cat <<'EOF' | sudo tee -a /etc/pacman.conf
-
-[cachyos]
-Include = /etc/pacman.d/cachyos-mirrorlist
-EOF
-fi
+curl https://mirror.cachyos.org/cachyos-repo.tar.xz -o cachyos-repo.tar.xz
+tar xvf cachyos-repo.tar.xz && cd cachyos-repo
+sudo ./cachyos-repo.sh
 
 echo "Refreshing repositories..."
 sudo pacman -Sy
