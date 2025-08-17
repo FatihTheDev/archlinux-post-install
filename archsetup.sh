@@ -26,7 +26,6 @@ ask_yn() {
 echo "Installing grub-btrfs..."
 sudo pacman -S --noconfirm grub-btrfs
 
-# Replace systemd service file fully to use Timeshift
 echo "Configuring grub-btrfsd to use Timeshift..."
 cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
 sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
@@ -127,7 +126,27 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     sudo virsh net-autostart default
 fi
 
-### 7. Prompt for VLC and KDE Connect ###
+### 7. Kernel headers installation ###
+if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
+    current_kernel=$(uname -r)
+    base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
+    suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
+
+    if [[ "$suffix" == *"arch"* ]]; then
+        sudo pacman -S --noconfirm linux-headers
+    elif [[ "$suffix" == *"lts"* ]]; then
+        sudo pacman -S --noconfirm linux-lts-headers
+    elif [[ "$suffix" == *"zen"* ]]; then
+        sudo pacman -S --noconfirm linux-zen-headers
+    elif [[ "$suffix" == *"hardened"* ]]; then
+        sudo pacman -S --noconfirm linux-hardened-headers
+    else
+        echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
+        echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
+    fi
+fi
+
+### 8. Prompt for VLC and KDE Connect ###
 if ask_yn "Do you want to install VLC media player?"; then
     sudo pacman -S --noconfirm vlc
 fi
