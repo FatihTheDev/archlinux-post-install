@@ -66,7 +66,7 @@ fi
 echo "Refreshing system repositories..."
 sudo pacman -Sy
 
-### 4. Install yay-bin from source ###
+### 4. Install yay-bin (AUR helper) from source ###
 echo "Installing yay-bin..."
 if ! command -v git &> /dev/null; then
     sudo pacman -S --noconfirm git base-devel
@@ -96,8 +96,27 @@ EOF
     echo "JetBrains Mono Nerd Font installed successfully!"
 fi
 
+### 6. Prompt for eza installation ###
+if ask_yn "Do you want to install eza (modern replacement for ls)?"; then
+    echo "Installing eza..."
+    sudo pacman -S --noconfirm eza
 
-### 6. Prompt for Zsh and customizations ###
+    USER_NAME=$(logname)
+    USER_HOME=$(eval echo ~"$USER_NAME")
+    ZSHRC="$USER_HOME/.zshrc"
+
+    echo "Adding eza aliases to $ZSHRC..."
+    {
+        echo "alias ls='eza --color=auto --group-directories-first'"
+        echo "alias l='eza -lah --color=auto --group-directories-first'"
+        echo "alias la='eza -a --color=auto --group-directories-first'"
+        echo "alias ll='eza -l --color=auto --group-directories-first'"
+    } | sudo tee -a "$ZSHRC"
+
+    sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
+fi
+
+### 7. Prompt for Zsh and customizations ###
 if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highlighting?"; then
     echo "Installing zsh, oh-my-zsh, starship..."
     sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
@@ -119,7 +138,7 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 fi
 
-### 7. Kernel headers installation ###
+### 8. Kernel headers installation ###
 if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
     current_kernel=$(uname -r)
     base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
@@ -139,7 +158,7 @@ if ask_yn "Do you want to install kernel headers? (Needed for building kernel mo
     fi
 fi
 
-### 8. Prompt for virtualization setup ###
+### 9. Prompt for virtualization setup ###
 if ask_yn "Do you want to install virtualization support (libvirt, virt-manager, QEMU)?"; then
     while true; do
         read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice
@@ -163,7 +182,7 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     sudo virsh net-autostart default
 fi
 
-### 9. Prompt for VLC and KDE Connect ###
+### 10. Prompt for VLC and KDE Connect ###
 if ask_yn "Do you want to install VLC media player?"; then
     sudo pacman -S --noconfirm vlc
 fi
