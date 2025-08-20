@@ -79,7 +79,25 @@ cd yay-bin
 makepkg -si --noconfirm
 EOF
 
-### 5. Prompt for Zsh and customizations ###
+### 5. Prompt for JetBrains Mono Nerd Font ###
+if ask_yn "Do you want to install JetBrains Mono Nerd Font (latest from Nerd Fonts)?"; then
+    echo "Downloading and installing JetBrains Mono Nerd Font..."
+    USER_NAME=$(logname)
+    USER_HOME=$(eval echo ~"$USER_NAME")
+
+    sudo -u "$USER_NAME" bash <<'EOF'
+mkdir -p ~/.local/share/fonts/nerd-fonts
+cd /tmp
+curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+unzip -o JetBrainsMono.zip -d ~/.local/share/fonts/nerd-fonts/JetBrainsMono
+fc-cache -fv
+EOF
+
+    echo "JetBrains Mono Nerd Font installed successfully!"
+fi
+
+
+### 6. Prompt for Zsh and customizations ###
 if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highlighting?"; then
     echo "Installing zsh, oh-my-zsh, starship..."
     sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
@@ -101,7 +119,7 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 fi
 
-### 6. Kernel headers installation ###
+### 7. Kernel headers installation ###
 if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
     current_kernel=$(uname -r)
     base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
@@ -121,7 +139,7 @@ if ask_yn "Do you want to install kernel headers? (Needed for building kernel mo
     fi
 fi
 
-### 7. Prompt for virtualization setup ###
+### 8. Prompt for virtualization setup ###
 if ask_yn "Do you want to install virtualization support (libvirt, virt-manager, QEMU)?"; then
     while true; do
         read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice
@@ -145,7 +163,7 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     sudo virsh net-autostart default
 fi
 
-### 8. Prompt for VLC and KDE Connect ###
+### 9. Prompt for VLC and KDE Connect ###
 if ask_yn "Do you want to install VLC media player?"; then
     sudo pacman -S --noconfirm vlc
 fi
