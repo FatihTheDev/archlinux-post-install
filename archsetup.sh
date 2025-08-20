@@ -9,7 +9,7 @@ ask_yn() {
     local prompt="$1"
     local response
     while true; do
-        read -rp "$prompt [y/n]: " response
+        read -rp "$prompt [y/n]: " response < /dev/tty
         case "$response" in
             [Yy]) return 0 ;;
             [Nn]) return 1 ;;
@@ -17,6 +17,10 @@ ask_yn() {
         esac
     done
 }
+
+### 0. Installing basic tools ###
+echo "Installing unzip..."
+sudo pacman -S --noconfirm unzip
 
 ### 1. Install grub-btrfs with Timeshift support ###
 echo "Installing grub-btrfs..."
@@ -46,7 +50,7 @@ EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now reflector.timer
-sudo systemctl enable --now reflector.service
+# sudo systemctl enable --now reflector.service
 
 ### 3. Add Chaotic AUR ###
 echo "Adding Chaotic AUR..."
@@ -66,7 +70,7 @@ fi
 echo "Refreshing system repositories..."
 sudo pacman -Sy
 
-### 4. Install yay-bin from source ###
+### 4. Install yay-bin (AUR helper) from source ###
 echo "Installing yay-bin..."
 if ! command -v git &> /dev/null; then
     sudo pacman -S --noconfirm git base-devel
@@ -80,24 +84,43 @@ makepkg -si --noconfirm
 EOF
 
 ### 5. Prompt for JetBrains Mono Nerd Font ###
-if ask_yn "Do you want to install JetBrains Mono Nerd Font (latest from Nerd Fonts)?"; then
-    echo "Downloading and installing JetBrains Mono Nerd Font..."
+if ask_yn "Do you want to install JetBrains Mono Nerd Font (Regular only)?"; then
+    echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
+    
     USER_NAME=$(logname)
     USER_HOME=$(eval echo ~"$USER_NAME")
 
     sudo -u "$USER_NAME" bash <<'EOF'
+    
 mkdir -p ~/.local/share/fonts/nerd-fonts
 cd /tmp
 curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-unzip -o JetBrainsMono.zip -d ~/.local/share/fonts/nerd-fonts/JetBrainsMono
+unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
 fc-cache -fv
 EOF
 
-    echo "JetBrains Mono Nerd Font installed successfully!"
+    echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 fi
 
+### 6. Prompt for eza installation ###
+if ask_yn "Do you want to install eza (modern replacement for ls)?"; then
+    echo "Installing eza..."
+    sudo pacman -S --noconfirm eza
 
-### 6. Prompt for Zsh and customizations ###
+    USER_NAME=$(logname)
+    USER_HOME=$(eval echo ~"$USER_NAME")
+    ZSHRC="$USER_HOME/.zshrc"
+
+    # echo "Adding eza aliases to $ZSHRC..."
+    # echo "alias ls='eza --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
+    # echo "alias l='eza -lah --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
+    # echo "alias la='eza -a --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
+    # echo "alias ll='eza -l --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
+
+    sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
+fi
+
+### 7. Prompt for Zsh and customizations ###
 if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highlighting?"; then
     echo "Installing zsh, oh-my-zsh, starship..."
     sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
@@ -113,13 +136,13 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
 
     echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$ZSHRC" 
-    echo "alias update-grub='grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
+    echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
 
-    chsh -s /bin/zsh "$USER_NAME"
+    sudo chsh -s /bin/zsh "$USER_NAME"
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 fi
 
-### 7. Kernel headers installation ###
+### 8. Kernel headers installation ###
 if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
     current_kernel=$(uname -r)
     base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
@@ -139,7 +162,7 @@ if ask_yn "Do you want to install kernel headers? (Needed for building kernel mo
     fi
 fi
 
-### 8. Prompt for virtualization setup ###
+### 9. Prompt for virtualization setup ###
 if ask_yn "Do you want to install virtualization support (libvirt, virt-manager, QEMU)?"; then
     while true; do
         read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice
@@ -163,7 +186,7 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     sudo virsh net-autostart default
 fi
 
-### 9. Prompt for VLC and KDE Connect ###
+### 10. Prompt for VLC and KDE Connect ###
 if ask_yn "Do you want to install VLC media player?"; then
     sudo pacman -S --noconfirm vlc
 fi
