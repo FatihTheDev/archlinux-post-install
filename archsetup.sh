@@ -109,11 +109,11 @@ if ask_yn "Do you want to install eza (modern replacement for ls)?"; then
     USER_HOME=$(eval echo ~"$USER_NAME")
     ZSHRC="$USER_HOME/.zshrc"
 
-    echo "Adding eza aliases to $ZSHRC..."
-    echo "alias ls='eza --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
-    echo "alias l='eza -lah --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
-    echo "alias la='eza -a --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
-    echo "alias ll='eza -l --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
+    # echo "Adding eza aliases to $ZSHRC..."
+    # echo "alias ls='eza --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
+    # echo "alias l='eza -lah --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
+    # echo "alias la='eza -a --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
+    # echo "alias ll='eza -l --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
 
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 fi
