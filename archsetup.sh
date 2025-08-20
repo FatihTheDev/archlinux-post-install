@@ -113,7 +113,7 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
 
     echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$ZSHRC" 
-    echo "alias update-grub='grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
+    echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
 
     chsh -s /bin/zsh "$USER_NAME"
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
