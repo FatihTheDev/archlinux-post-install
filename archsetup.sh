@@ -18,6 +18,10 @@ ask_yn() {
     done
 }
 
+### 0. Installing basic tools ###
+echo "Installing unzip..."
+sudo pacman -S --noconfirm unzip
+
 ### 1. Install grub-btrfs with Timeshift support ###
 echo "Installing grub-btrfs..."
 sudo pacman -S --noconfirm grub-btrfs
