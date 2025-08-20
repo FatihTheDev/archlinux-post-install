@@ -86,10 +86,12 @@ EOF
 ### 5. Prompt for JetBrains Mono Nerd Font ###
 if ask_yn "Do you want to install JetBrains Mono Nerd Font (Regular only)?"; then
     echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
+    
     USER_NAME=$(logname)
     USER_HOME=$(eval echo ~"$USER_NAME")
 
     sudo -u "$USER_NAME" bash <<'EOF'
+    
 mkdir -p ~/.local/share/fonts/nerd-fonts
 cd /tmp
 curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
