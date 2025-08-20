@@ -84,8 +84,8 @@ makepkg -si --noconfirm
 EOF
 
 ### 5. Prompt for JetBrains Mono Nerd Font ###
-if ask_yn "Do you want to install JetBrains Mono Nerd Font (latest from Nerd Fonts)?"; then
-    echo "Downloading and installing JetBrains Mono Nerd Font..."
+if ask_yn "Do you want to install JetBrains Mono Nerd Font (Regular only)?"; then
+    echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     USER_NAME=$(logname)
     USER_HOME=$(eval echo ~"$USER_NAME")
 
@@ -93,11 +93,11 @@ if ask_yn "Do you want to install JetBrains Mono Nerd Font (latest from Nerd Fon
 mkdir -p ~/.local/share/fonts/nerd-fonts
 cd /tmp
 curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-unzip -o JetBrainsMono.zip -d ~/.local/share/fonts/nerd-fonts/JetBrainsMono
+unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
 fc-cache -fv
 EOF
 
-    echo "JetBrains Mono Nerd Font installed successfully!"
+    echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 fi
 
 ### 6. Prompt for eza installation ###
