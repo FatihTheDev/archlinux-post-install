@@ -183,9 +183,9 @@ else
     BASHRC="$USER_HOME/.bashrc"
 
     # Adding handy aliases to .bashrc #
-    alias ll="ls -l" | sudo tee -a "$ZSHRC"
-    alias la="ls -a" | sudo tee -a "$ZSHRC"
-    alias l="ls -la" | sudo tee -a "$ZSHRC"
+    alias ll="ls -l" | sudo tee -a "$BASHRC"
+    alias la="ls -a" | sudo tee -a "$BASHRC"
+    alias l="ls -la" | sudo tee -a "$BASHRC"
     echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$BASHRC"
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$BASHRC"
     echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$BASHRC"
