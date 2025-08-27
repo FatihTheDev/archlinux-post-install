@@ -166,7 +166,10 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
 
     # Adding handy aliases to .zshrc #
-    echo "alias removeall='f() { sudo yay -Rcns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$ZSHRC" 
+    alias ll="ls -l" | sudo tee -a "$ZSHRC"
+    alias la="ls -a"| sudo tee -a "$ZSHRC"
+    alias l="ls -la"| sudo tee -a "$ZSHRC"
+    echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC" 
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
     echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$ZSHRC"
 
@@ -180,7 +183,10 @@ else
     BASHRC="$USER_HOME/.bashrc"
 
     # Adding handy aliases to .bashrc #
-    echo "alias removeall='f() { sudo yay -Rcns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$BASHRC"
+    alias ll="ls -l" | sudo tee -a "$ZSHRC"
+    alias la="ls -a" | sudo tee -a "$ZSHRC"
+    alias l="ls -la" | sudo tee -a "$ZSHRC"
+    echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$BASHRC"
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$BASHRC"
     echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$BASHRC"
 
