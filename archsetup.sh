@@ -84,7 +84,7 @@ makepkg -si --noconfirm
 EOF
 
 
-### 6. Add CachyOS repositories ###
+### 5. Add CachyOS repositories ###
 if ask_yn "Do you want to add CachyOS repositories?"; then
     echo "Adding CachyOS repos..."
     USER_NAME=$(logname)
