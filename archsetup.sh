@@ -19,12 +19,12 @@ ask_yn() {
 }
 
 ### 0. Installing basic tools ###
-echo "Installing unzip..."
-sudo pacman -S --noconfirm unzip
+echo "Installing basic system tools..."
+sudo pacman -S --noconfirm man unzip
 
 ### 1. Install grub-btrfs with Timeshift support ###
 echo "Installing grub-btrfs..."
-sudo pacman -S --noconfirm grub-btrfs
+sudo pacman -S --noconfirm timeshift grub-btrfs
 
 echo "Configuring grub-btrfsd to use Timeshift..."
 sudo cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
@@ -83,7 +83,55 @@ cd yay-bin
 makepkg -si --noconfirm
 EOF
 
-### 5. Prompt for JetBrains Mono Nerd Font ###
+
+### 6. Add CachyOS repositories ###
+if ask_yn "Do you want to add CachyOS repositories?"; then
+    echo "Adding CachyOS repos..."
+    USER_NAME=$(logname)
+
+    sudo -u "$USER_NAME" bash <<'EOF'
+    cd /tmp
+    curl -LO https://mirror.cachyos.org/cachyos-repo.tar.xz
+    tar xvf cachyos-repo.tar.xz
+    cd cachyos-repo
+    sudo ./cachyos-repo.sh
+    EOF
+
+    sudo pacman -Sy
+
+    if ask_yn "Do you want to install CachyOS kernel?"; then
+        while true; do
+            read -rp "Which CachyOS kernel do you want? [regular/lts]: " kernel_choice
+            case "$kernel_choice" in
+                regular)
+                    sudo pacman -S --noconfirm linux-cachyos linux-cachyos-headers
+                    chosen_kernel="linux-cachyos"
+                    break
+                    ;;
+                lts)
+                    sudo pacman -S --noconfirm linux-cachyos-lts linux-cachyos-lts-headers
+                    chosen_kernel="linux-cachyos-lts"
+                    break
+                    ;;
+                *)
+                    echo "Please enter 'regular' or 'lts'."
+                    ;;
+            esac
+        done
+
+        echo "Updating grub to set CachyOS kernel as default..."
+        sudo grub-mkconfig -o /boot/grub/grub.cfg
+
+        # Optional: set CachyOS kernel to boot first
+        sudo grub-set-default 0
+    else
+        chosen_kernel=""
+    fi
+else
+    chosen_kernel=""
+fi
+
+### 6. Prompt for JetBrains Mono Nerd Font ###
 if ask_yn "Do you want to install JetBrains Mono Nerd Font (Regular only)?"; then
     echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     
@@ -102,24 +150,6 @@ EOF
     echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 fi
 
-### 6. Prompt for eza installation ###
-if ask_yn "Do you want to install eza (modern replacement for ls)?"; then
-    echo "Installing eza..."
-    sudo pacman -S --noconfirm eza
-
-    USER_NAME=$(logname)
-    USER_HOME=$(eval echo ~"$USER_NAME")
-    ZSHRC="$USER_HOME/.zshrc"
-
-    # echo "Adding eza aliases to $ZSHRC..."
-    # echo "alias ls='eza --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
-    # echo "alias l='eza -lah --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
-    # echo "alias la='eza -a --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
-    # echo "alias ll='eza -l --color=auto --group-directories-first --icons'" | sudo tee -a "$ZSHRC"
-
-    sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
-fi
-
 ### 7. Prompt for Zsh and customizations ###
 if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highlighting?"; then
     echo "Installing zsh, oh-my-zsh, starship..."
@@ -135,31 +165,50 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
 
     echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
 
+    # Adding handy aliases to .zshrc #
     echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$ZSHRC" 
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
+    echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$ZSHRC"
 
     sudo chsh -s /bin/zsh "$USER_NAME"
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
+
+else
+    echo "User skipped Zsh. Adding aliases to .bashrc instead..."
+    USER_NAME=$(logname)
+    USER_HOME=$(eval echo ~"$USER_NAME")
+    BASHRC="$USER_HOME/.bashrc"
+
+    # Adding handy aliases to .bashrc #
+    echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$BASHRC"
+    echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$BASHRC"
+    echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$BASHRC"
+
+    sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$BASHRC"
 fi
 
-### 8. Kernel headers installation ###
-if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
-    current_kernel=$(uname -r)
-    base_kernel=$(echo "$current_kernel" | cut -d'-' -f1)
-    suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
 
-    if [[ "$suffix" == *"arch"* ]]; then
-        sudo pacman -S --noconfirm linux-headers
-    elif [[ "$suffix" == *"lts"* ]]; then
-        sudo pacman -S --noconfirm linux-lts-headers
-    elif [[ "$suffix" == *"zen"* ]]; then
-        sudo pacman -S --noconfirm linux-zen-headers
-    elif [[ "$suffix" == *"hardened"* ]]; then
-        sudo pacman -S --noconfirm linux-hardened-headers
-    else
-        echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
-        echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
+### 8. Kernel headers installation ###
+if [[ -z "${chosen_kernel:-}" ]]; then
+    if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
+        current_kernel=$(uname -r)
+        suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
+
+        if [[ "$suffix" == *"arch"* ]]; then
+            sudo pacman -S --noconfirm linux-headers
+        elif [[ "$suffix" == *"lts"* ]]; then
+            sudo pacman -S --noconfirm linux-lts-headers
+        elif [[ "$suffix" == *"zen"* ]]; then
+            sudo pacman -S --noconfirm linux-zen-headers
+        elif [[ "$suffix" == *"hardened"* ]]; then
+            sudo pacman -S --noconfirm linux-hardened-headers
+        else
+            echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
+            echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
+        fi
     fi
+else
+    echo "Skipping kernel headers for old kernel since CachyOS kernel was installed."
 fi
 
 ### 9. Prompt for virtualization setup ###
