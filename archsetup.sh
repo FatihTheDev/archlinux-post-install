@@ -45,7 +45,7 @@ sudo mkdir -p "$REFLECTOR_OVERRIDE_DIR"
 cat <<EOF | sudo tee "$REFLECTOR_OVERRIDE_DIR/override.conf"
 [Service]
 ExecStart=
-ExecStart=/usr/bin/reflector --latest 10 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist
+ExecStart=/usr/bin/reflector --latest 10 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist
 EOF
 
 sudo systemctl daemon-reload
@@ -168,7 +168,7 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     # Adding handy aliases to .zshrc #
     echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$ZSHRC" 
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
-    echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$ZSHRC"
+    echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$ZSHRC"
 
     sudo chsh -s /bin/zsh "$USER_NAME"
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
@@ -182,7 +182,7 @@ else
     # Adding handy aliases to .bashrc #
     echo "alias removeall='f() { sudo pacman -Rns \$(pacman -Qq | grep \"^\$1\"); }; f'" | sudo tee -a "$BASHRC"
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$BASHRC"
-    echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$BASHRC"
+    echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$BASHRC"
 
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$BASHRC"
 fi
