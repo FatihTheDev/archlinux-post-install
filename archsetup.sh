@@ -49,7 +49,7 @@ ExecStart=/usr/bin/reflector --latest 10 --sort rate --fastest 5 --protocol http
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now reflector.timer
+# sudo systemctl enable --now reflector.timer
 # sudo systemctl enable --now reflector.service
 
 ### 3. Add Chaotic AUR ###
@@ -250,5 +250,8 @@ if ask_yn "Do you want to install KDE Connect?"; then
     sudo pacman -S --noconfirm kdeconnect
 fi
 
+if ask_yn "Do you want to install WineZGUI (WINE GUI that requires Flatpak)?"; then
+    flatpak install io.github.fastrizwaan.WineZGUI
+fi
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
