@@ -6,8 +6,8 @@
   
   ```sudo wget -qO - https://raw.githubusercontent.com/FatihTheDev/archlinux-post-install/main/archsetup.sh | bash```
 
+  Note: this is a capital o, not a zero.
+
   - Or clone the repo and run the script directly:
     
   ```git clone https://github.com/FatihTheDev/archlinux-post-install.git && sudo chmod +x archsetup.sh && ./archsetup.sh```
-
-  - **Important**: For additional gaming tweaks (experimental), visit https://github.com/FatihTheDev/archlinux-post-install/blob/testing-gaming/README.md
