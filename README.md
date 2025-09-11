@@ -10,4 +10,8 @@
 
   - Or clone the repo and run the script directly:
     
-  ```git clone https://github.com/FatihTheDev/archlinux-post-install.git && sudo chmod +x archsetup.sh && ./archsetup.sh```
+  ```
+    git clone https://github.com/FatihTheDev/archlinux-post-install.git
+    sudo chmod +x archsetup.sh
+    ./archsetup.sh
+  ```
