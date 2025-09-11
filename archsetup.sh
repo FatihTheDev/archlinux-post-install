@@ -246,7 +246,7 @@ if ask_yn "Do you want to install VLC media player?"; then
     sudo pacman -S --noconfirm vlc
 fi
 
-if ask_yn "Do you want to install KDE Connect?"; then
+if ask_yn "Do you want to install KDE Connect (to sync phone with this device)?"; then
     sudo pacman -S --noconfirm kdeconnect
 fi
 
