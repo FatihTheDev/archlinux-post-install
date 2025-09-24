@@ -20,7 +20,10 @@ ask_yn() {
 
 ### 0. Installing basic tools ###
 echo "Installing basic system tools..."
-sudo pacman -S --noconfirm man unzip
+sudo pacman -S --noconfirm man unzip tldr
+
+# Installing flatpak
+sudo pacman -S --noconfirm flatpak
 
 ### 1. Install grub-btrfs with Timeshift support ###
 echo "Installing grub-btrfs..."
@@ -248,10 +251,6 @@ fi
 
 if ask_yn "Do you want to install KDE Connect (to sync phone with this device)?"; then
     sudo pacman -S --noconfirm kdeconnect
-fi
-
-if ask_yn "Do you want to install WineZGUI (WINE GUI that requires Flatpak)?"; then
-    flatpak install io.github.fastrizwaan.WineZGUI
 fi
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
