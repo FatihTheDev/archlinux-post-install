@@ -20,10 +20,7 @@ ask_yn() {
 
 ### 0. Installing basic tools ###
 echo "Installing basic system tools..."
-sudo pacman -S --noconfirm man unzip tldr
-
-# Installing flatpak
-sudo pacman -S --noconfirm flatpak
+sudo pacman -S --noconfirm man unzip tldr flatpak
 
 ### 1. Install grub-btrfs with Timeshift support ###
 echo "Installing grub-btrfs..."
@@ -98,13 +95,13 @@ if ask_yn "Do you want to add CachyOS repositories?"; then
     tar xvf cachyos-repo.tar.xz
     cd cachyos-repo
     sudo ./cachyos-repo.sh
-    EOF
+EOF
 
     sudo pacman -Sy
 
     if ask_yn "Do you want to install CachyOS kernel?"; then
         while true; do
-            read -rp "Which CachyOS kernel do you want? [regular/lts]: " kernel_choice
+            read -rp "Which CachyOS kernel do you want? [regular/lts]: " kernel_choice < /dev/tty
             case "$kernel_choice" in
                 regular)
                     sudo pacman -S --noconfirm linux-cachyos linux-cachyos-headers
@@ -139,15 +136,13 @@ if ask_yn "Do you want to install JetBrains Mono Nerd Font (Regular only)?"; the
     echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     
     USER_NAME=$(logname)
-    USER_HOME=$(eval echo ~"$USER_NAME")
 
     sudo -u "$USER_NAME" bash <<'EOF'
-    
-mkdir -p ~/.local/share/fonts/nerd-fonts
-cd /tmp
-curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
-fc-cache -fv
+    mkdir -p ~/.local/share/fonts/nerd-fonts
+    cd /tmp
+    curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+    unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
+    fc-cache -fv
 EOF
 
     echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
@@ -159,7 +154,7 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
     USER_NAME=$(logname)
-    USER_HOME=$(eval echo ~"$USER_NAME")
+    USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
     ZSHRC="$USER_HOME/.zshrc"
 
     sudo -u "$USER_NAME" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
@@ -169,10 +164,10 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
 
     # Adding handy aliases to .zshrc #
-    alias ll="ls -l" | sudo tee -a "$ZSHRC"
-    alias la="ls -a"| sudo tee -a "$ZSHRC"
-    alias l="ls -la"| sudo tee -a "$ZSHRC"
-    echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC" 
+    echo 'alias ll="ls -l"' | sudo tee -a "$ZSHRC"
+    echo 'alias la="ls -a"' | sudo tee -a "$ZSHRC"
+    echo 'alias l="ls -la"' | sudo tee -a "$ZSHRC"
+    echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC"  
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
     echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$ZSHRC"
 
@@ -182,13 +177,13 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
 else
     echo "User skipped Zsh. Adding aliases to .bashrc instead..."
     USER_NAME=$(logname)
-    USER_HOME=$(eval echo ~"$USER_NAME")
+    USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
     BASHRC="$USER_HOME/.bashrc"
 
     # Adding handy aliases to .bashrc #
-    alias ll="ls -l" | sudo tee -a "$BASHRC"
-    alias la="ls -a" | sudo tee -a "$BASHRC"
-    alias l="ls -la" | sudo tee -a "$BASHRC"
+    echo 'alias ll="ls -l"' | sudo tee -a "$BASHRC"
+    echo 'alias la="ls -a"' | sudo tee -a "$BASHRC"
+    echo 'alias l="ls -la"' | sudo tee -a "$BASHRC"
     echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$BASHRC"
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$BASHRC"
     echo "alias update-mirrors='sudo reflector --latest 10 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist'" | sudo tee -a "$BASHRC"
@@ -223,7 +218,7 @@ fi
 ### 9. Prompt for virtualization setup ###
 if ask_yn "Do you want to install virtualization support (libvirt, virt-manager, QEMU)?"; then
     while true; do
-        read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice
+        read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice < /dev/tty
         case "$qemu_choice" in
             full) qemu_pkg="qemu-full"; break ;;
             desktop) qemu_pkg="qemu-desktop"; break ;;
@@ -237,8 +232,9 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     echo "Enabling virtualization services..."
     sudo systemctl enable --now libvirtd.service virtlogd.service
 
-    echo "Adding user to libvirt group..."
+    echo "Adding user to libvirt and kvm groups..."
     sudo usermod -aG libvirt $(logname)
+    sudo usermod -aG kvm $(logname)
 
     echo "Autostarting default libvirt network..."
     sudo virsh net-autostart default
