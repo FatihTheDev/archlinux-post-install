@@ -242,7 +242,7 @@ fi
 
 ### 10. Prompt for VLC and KDE Connect ###
 if ask_yn "Do you want to install VLC media player?"; then
-    sudo pacman -S --noconfirm vlc
+    sudo pacman -S --noconfirm vlc vlc-plugin-ffmpeg
 fi
 
 if ask_yn "Do you want to install KDE Connect (to sync phone with this device)?"; then
