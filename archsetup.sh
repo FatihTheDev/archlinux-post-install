@@ -240,9 +240,9 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     sudo virsh net-autostart default
 fi
 
-### 10. Prompt for VLC and KDE Connect ###
-if ask_yn "Do you want to install VLC media player?"; then
-    sudo pacman -S --noconfirm vlc vlc-plugin-ffmpeg
+### 10. Prompt for media player and KDE Connect ###
+if ask_yn "Do you want to install Celluloid media player?"; then
+    sudo pacman -S --noconfirm celluloid
 fi
 
 if ask_yn "Do you want to install KDE Connect (to sync phone with this device)?"; then
