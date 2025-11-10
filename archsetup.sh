@@ -131,22 +131,20 @@ else
     chosen_kernel=""
 fi
 
-### 6. Prompt for JetBrains Mono Nerd Font ###
-if ask_yn "Do you want to install JetBrains Mono Nerd Font (Regular only)?"; then
-    echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
+### 6. Install JetBrains Mono Nerd Font ###
+echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     
-    USER_NAME=$(logname)
+USER_NAME=$(logname)
 
-    sudo -u "$USER_NAME" bash <<'EOF'
-    mkdir -p ~/.local/share/fonts/nerd-fonts
-    cd /tmp
-    curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-    unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
-    fc-cache -fv
+sudo -u "$USER_NAME" bash <<'EOF'
+mkdir -p ~/.local/share/fonts/nerd-fonts
+cd /tmp
+curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
+fc-cache -fv
 EOF
 
-    echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
-fi
+echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 
 ### 7. Prompt for Zsh and customizations ###
 if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highlighting?"; then
