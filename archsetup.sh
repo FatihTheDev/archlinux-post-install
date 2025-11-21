@@ -169,7 +169,9 @@ if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highl
     echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
     echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (you can remove the backslashes)' | sudo tee -a "$ZSHRC"   
     echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
-
+    echo '#For theming the syntax highlighing' | sudo tee -a "$ZSHRC"
+    echo '[ -f ~/.config/zsh_syntax_theme ] && source ~/.config/zsh_syntax_theme' | sudo tee -a "$ZSHRC"
+    
     sudo chsh -s /bin/zsh "$USER_NAME"
     sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 
