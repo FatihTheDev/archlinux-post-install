@@ -84,54 +84,7 @@ makepkg -si --noconfirm
 EOF
 
 
-### 5. Add CachyOS repositories ###
-if ask_yn "Do you want to add CachyOS repositories?"; then
-    echo "Adding CachyOS repos..."
-    USER_NAME=$(logname)
-
-    sudo -u "$USER_NAME" bash <<'EOF'
-    cd /tmp
-    curl -LO https://mirror.cachyos.org/cachyos-repo.tar.xz
-    tar xvf cachyos-repo.tar.xz
-    cd cachyos-repo
-    sudo ./cachyos-repo.sh
-EOF
-
-    sudo pacman -Sy
-
-    if ask_yn "Do you want to install CachyOS kernel?"; then
-        while true; do
-            read -rp "Which CachyOS kernel do you want? [regular/lts]: " kernel_choice < /dev/tty
-            case "$kernel_choice" in
-                regular)
-                    sudo pacman -S --noconfirm linux-cachyos linux-cachyos-headers
-                    chosen_kernel="linux-cachyos"
-                    break
-                    ;;
-                lts)
-                    sudo pacman -S --noconfirm linux-cachyos-lts linux-cachyos-lts-headers
-                    chosen_kernel="linux-cachyos-lts"
-                    break
-                    ;;
-                *)
-                    echo "Please enter 'regular' or 'lts'."
-                    ;;
-            esac
-        done
-
-        echo "Updating grub to set CachyOS kernel as default..."
-        sudo grub-mkconfig -o /boot/grub/grub.cfg
-
-        # Optional: set CachyOS kernel to boot first
-        sudo grub-set-default 0
-    else
-        chosen_kernel=""
-    fi
-else
-    chosen_kernel=""
-fi
-
-### 6. Install JetBrains Mono Nerd Font ###
+### 5. Install JetBrains Mono Nerd Font ###
 echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     
 USER_NAME=$(logname)
@@ -146,79 +99,66 @@ EOF
 
 echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 
-### 7. Prompt for Zsh and customizations ###
-if ask_yn "Do you want to install Zsh with Oh-My-Zsh, Starship, and syntax highlighting?"; then
-    echo "Installing zsh, oh-my-zsh, starship..."
-    sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
-    USER_NAME=$(logname)
-    USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
-    ZSHRC="$USER_HOME/.zshrc"
+### 6. Install Zsh and customizations ###
+echo "Installing zsh, oh-my-zsh, starship..."
+sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
-    sudo -u "$USER_NAME" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-    sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
-    sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
+USER_NAME=$(logname)
+USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
+ZSHRC="$USER_HOME/.zshrc"
 
-    echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
+# Install Oh-My-Zsh unattended
+sudo -u "$USER_NAME" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 
-    # Adding handy aliases to .zshrc #
-    echo 'alias ll="ls -l"' | sudo tee -a "$ZSHRC"
-    echo 'alias la="ls -a"' | sudo tee -a "$ZSHRC"
-    echo 'alias l="ls -la"' | sudo tee -a "$ZSHRC"
-    echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC"  
-    echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
-    echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (you can remove the backslashes)' | sudo tee -a "$ZSHRC"   
-    echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
-    echo '#For theming the syntax highlighing' | sudo tee -a "$ZSHRC"
-    echo '[ -f ~/.config/zsh_syntax_theme ] && source ~/.config/zsh_syntax_theme' | sudo tee -a "$ZSHRC"
-    
-    sudo chsh -s /bin/zsh "$USER_NAME"
-    sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
+# Ensure .config exists
+sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
 
+# Add Starship init
+sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
+
+# Add zsh-syntax-highlighting
+echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
+
+# Aliases
+echo 'alias ll="ls -l"' | sudo tee -a "$ZSHRC"
+echo 'alias la="ls -a"' | sudo tee -a "$ZSHRC"
+echo 'alias l="ls -la"' | sudo tee -a "$ZSHRC"
+echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC"
+echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
+echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (you can remove the backslashes)' | sudo tee -a "$ZSHRC"
+echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
+
+# For theme customizations
+echo '#For theming the syntax highlighting' | sudo tee -a "$ZSHRC"
+echo '[ -f ~/.config/zsh_syntax_theme ] && source ~/.config/zsh_syntax_theme' | sudo tee -a "$ZSHRC"
+
+# Set default shell to zsh
+sudo chsh -s /bin/zsh "$USER_NAME"
+
+# Fix permissions
+sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
+
+
+### 7. Kernel headers installation ###
+current_kernel=$(uname -r)
+suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
+
+if [[ "$suffix" == *"arch"* ]]; then
+    sudo pacman -S --noconfirm linux-headers
+elif [[ "$suffix" == *"lts"* ]]; then
+        sudo pacman -S --noconfirm linux-lts-headers
+elif [[ "$suffix" == *"zen"* ]]; then
+    sudo pacman -S --noconfirm linux-zen-headers
+elif [[ "$suffix" == *"hardened"* ]]; then
+    sudo pacman -S --noconfirm linux-hardened-headers
 else
-    echo "User skipped Zsh. Adding aliases to .bashrc instead..."
-    USER_NAME=$(logname)
-    USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
-    BASHRC="$USER_HOME/.bashrc"
-
-    # Adding handy aliases to .bashrc #
-    echo 'alias ll="ls -l"' | sudo tee -a "$BASHRC"
-    echo 'alias la="ls -a"' | sudo tee -a "$BASHRC"
-    echo 'alias l="ls -la"' | sudo tee -a "$BASHRC"
-    echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$BASHRC"
-    echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$BASHRC"
-    echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (you can remove the backslashes)' | sudo tee -a "$BASHRC"
-    echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$BASHRC"
-
-    sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$BASHRC"
+    echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
+    echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
 fi
 
 
-### 8. Kernel headers installation ###
-if [[ -z "${chosen_kernel:-}" ]]; then
-    if ask_yn "Do you want to install kernel headers? (Needed for building kernel modules like VirtualBox, NVIDIA drivers, ZFS, etc.)"; then
-        current_kernel=$(uname -r)
-        suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
-
-        if [[ "$suffix" == *"arch"* ]]; then
-            sudo pacman -S --noconfirm linux-headers
-        elif [[ "$suffix" == *"lts"* ]]; then
-            sudo pacman -S --noconfirm linux-lts-headers
-        elif [[ "$suffix" == *"zen"* ]]; then
-            sudo pacman -S --noconfirm linux-zen-headers
-        elif [[ "$suffix" == *"hardened"* ]]; then
-            sudo pacman -S --noconfirm linux-hardened-headers
-        else
-            echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
-            echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
-        fi
-    fi
-else
-    echo "Skipping kernel headers for old kernel since CachyOS kernel was installed."
-fi
-
-### 9. Prompt for virtualization setup ###
-if ask_yn "Do you want to install virtualization support (libvirt, virt-manager, QEMU)?"; then
+### 8. Virtualization setup ###
     while true; do
         read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice < /dev/tty
         case "$qemu_choice" in
@@ -232,7 +172,7 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
     sudo pacman -S --noconfirm libvirt virt-manager "$qemu_pkg" dnsmasq dmidecode
 
     echo "Enabling virtualization services..."
-    sudo systemctl enable --now libvirtd.service virtlogd.service
+    sudo systemctl enable libvirtd.service virtlogd.service
 
     echo "Adding user to libvirt and kvm groups..."
     sudo usermod -aG libvirt $(logname)
@@ -240,15 +180,11 @@ if ask_yn "Do you want to install virtualization support (libvirt, virt-manager,
 
     echo "Autostarting default libvirt network..."
     sudo virsh net-autostart default
-fi
+    
 
-### 10. Prompt for media player and KDE Connect ###
-if ask_yn "Do you want to install Celluloid media player?"; then
+### 9. Installing Celluloid media player ###
+    echo "Installing Celluloid media player"
     sudo pacman -S --noconfirm celluloid
-fi
 
-if ask_yn "Do you want to install KDE Connect (to sync phone with this device)?"; then
-    sudo pacman -S --noconfirm kdeconnect
-fi
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
