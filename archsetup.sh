@@ -172,7 +172,7 @@ fi
     sudo pacman -S --noconfirm libvirt virt-manager "$qemu_pkg" dnsmasq dmidecode
 
     echo "Enabling virtualization services..."
-    sudo systemctl enable libvirtd.service virtlogd.service
+    sudo systemctl enable --now libvirtd.service virtlogd.service
 
     echo "Adding user to libvirt and kvm groups..."
     sudo usermod -aG libvirt $(logname)
