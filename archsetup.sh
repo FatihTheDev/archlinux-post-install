@@ -182,9 +182,4 @@ fi
     sudo virsh net-autostart default
     
 
-### 9. Installing Celluloid media player ###
-    echo "Installing Celluloid media player"
-    sudo pacman -S --noconfirm celluloid
-
-
 echo "All tasks completed successfully! Please reboot to apply all changes."
