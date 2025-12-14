@@ -124,10 +124,36 @@ echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlight
 echo 'alias ll="ls -l"' | sudo tee -a "$ZSHRC"
 echo 'alias la="ls -a"' | sudo tee -a "$ZSHRC"
 echo 'alias l="ls -la"' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
 echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC"
 echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
 echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (you can remove the backslashes)' | sudo tee -a "$ZSHRC"
 echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
+echo '# Pin a package (add to IgnorePkg)' | sudo tee -a "$ZSHRC"
+echo 'pin() {
+    comm -23 <(pacman -Qq | sort) <(grep "^IgnorePkg" /etc/pacman.conf | cut -d"=" -f2 | tr " " "\n" | sort -u | grep -v "^$") | \
+    fzf --prompt="Pin: " --height=50% --border | \
+    while read pkg; do
+        sudo sed -i "/^IgnorePkg/ s/$/ \$pkg/" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg/ s/  / /g" /etc/pacman.conf
+        echo "Pinned: \$pkg"
+    done
+}' | sudo tee -a "$ZSHRC"
+echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
+echo 'unpin() {
+    grep "^IgnorePkg" /etc/pacman.conf | cut -d"=" -f2 | tr " " "\n" | sed "/^$/d" | \
+    fzf --prompt="Unpin: " --height=50% --border --multi | \
+    while read pkg; do
+        sudo sed -i "/^IgnorePkg/ s/ \$pkg//g; /^IgnorePkg\$/d" /etc/pacman.conf
+        echo "Unpinned: \$pkg"
+    done
+}' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
 
 # For theme customizations
 echo '#For theming the syntax highlighting' | sudo tee -a "$ZSHRC"
