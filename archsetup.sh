@@ -137,7 +137,7 @@ echo '' | sudo tee -a "$ZSHRC"
 echo '# Pin a package (add to IgnorePkg)' | sudo tee -a "$ZSHRC"
 echo 'pin() {
     comm -23 <(pacman -Qq | sort) <(grep "^IgnorePkg" /etc/pacman.conf | cut -d"=" -f2 | tr " " "\n" | sort -u | grep -v "^$") | \
-    fzf --prompt="Pin: " --height=50% --border | \
+    fzf --prompt="Pin: " --height=70% --border | \
     while read pkg; do
         sudo sed -i "/^IgnorePkg/ s/$/ \$pkg/" /etc/pacman.conf
         sudo sed -i "/^IgnorePkg/ s/  / /g" /etc/pacman.conf
@@ -147,7 +147,7 @@ echo 'pin() {
 echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
 echo 'unpin() {
     grep "^IgnorePkg" /etc/pacman.conf | cut -d"=" -f2 | tr " " "\n" | sed "/^$/d" | \
-    fzf --prompt="Unpin: " --height=50% --border --multi | \
+    fzf --prompt="Unpin: " --height=70% --border --multi | \
     while read pkg; do
         sudo sed -i "/^IgnorePkg/ s/ \$pkg//g; /^IgnorePkg\$/d" /etc/pacman.conf
         echo "Unpinned: \$pkg"
