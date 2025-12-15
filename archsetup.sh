@@ -100,15 +100,28 @@ EOF
 echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 
 ### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
-### and uncomment IgnorePkg to make pin and unpin aliases work properly ###
 
+# uncommenting parallel downloads in /etc/pacman.conf
+sudo sed -i 's/^#\s*\(ParallelDownloads\s*=\s*[0-9]*\)/\1/' /etc/pacman.conf
+# uncommenting MAKEFLAGS to use number of threads available on device in /etc/makepkg.conf
+threads=$(nproc --all)
+sudo awk -v threads="$threads" '
+/^#\s*MAKEFLAGS=/ { sub(/#.*/, "MAKEFLAGS=\"-j" threads "\""); found=1 }
+/^MAKEFLAGS=/ { sub(/=.*/, "=\"-j" threads "\""); found=1 }
+{ print }
+END {
+    if (!found) print "MAKEFLAGS=\"-j" threads "\""
+}
+' /etc/makepkg.conf > /tmp/makepkg.conf && sudo mv /tmp/makepkg.conf /etc/makepkg.conf 
+
+# Uncommenting IgnorePkg in /etc/pacman.conf to make pin and unpin aliases work properly
 sudo sed -i \
   -e 's/^#\s*\(IgnorePkg\s*=.*\)/\1/' \
   -e '/^IgnorePkg\s*=/!{/^\[options\]/a IgnorePkg =}' \
   /etc/pacman.conf
 
 
-### 6. Install Zsh and customizations ###
+### 7. Install Zsh and customizations ###
 echo "Installing zsh, oh-my-zsh, starship..."
 sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
@@ -181,7 +194,7 @@ sudo chsh -s /bin/zsh "$USER_NAME"
 sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 
 
-### 7. Kernel headers installation ###
+### 8. Kernel headers installation ###
 current_kernel=$(uname -r)
 suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
 
@@ -199,7 +212,7 @@ else
 fi
 
 
-### 8. Virtualization setup ###
+### 9. Virtualization setup ###
     while true; do
         read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice < /dev/tty
         case "$qemu_choice" in
