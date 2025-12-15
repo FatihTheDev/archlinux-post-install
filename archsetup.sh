@@ -172,14 +172,26 @@ echo 'pin() {
 }' | sudo tee -a "$ZSHRC"
 echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
 echo 'unpin() {
-    grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sed '/^$/d' |
-    fzf --prompt="Unpin: " --height=70% --border --multi |
+    grep "^IgnorePkg" /etc/pacman.conf |
+        cut -d= -f2 |
+        tr " " "\n" |
+        sed '/^$/d' |
+        fzf --prompt="Unpin: " --height=70% --border --multi |
     while read -r pkg; do
         escaped_pkg=$(printf '%s\n' "$pkg" | sed 's/[.[\*^$]/\\&/g')
+
+        # Remove the package from IgnorePkg
         sudo sed -i "/^IgnorePkg/ s/[[:space:]]$escaped_pkg//g" /etc/pacman.conf
-        sudo sed -i "/^IgnorePkg[[:space:]]*=[[:space:]]*$/d" /etc/pacman.conf
+
+        # Normalize spacing and ensure directive remains
+        sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg[[:space:]]*=/ s/$//" /etc/pacman.conf
+
         echo "Unpinned: $pkg"
     done
+
+    # If IgnorePkg exists but has no packages, force it to be exactly `IgnorePkg =`
+    sudo sed -i 's/^IgnorePkg[[:space:]]*=[[:space:]]*$/IgnorePkg =/' /etc/pacman.conf
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
