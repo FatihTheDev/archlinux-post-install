@@ -136,21 +136,28 @@ echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Pin a package (add to IgnorePkg)' | sudo tee -a "$ZSHRC"
 echo 'pin() {
-    comm -23 <(pacman -Qq | sort) <(grep "^IgnorePkg" /etc/pacman.conf | cut -d"=" -f2 | tr " " "\n" | sort -u | grep -v "^$") | \
-    fzf --prompt="Pin: " --height=70% --border | \
-    while read pkg; do
-        sudo sed -i "/^IgnorePkg/ s/$/ \$pkg/" /etc/pacman.conf
-        sudo sed -i "/^IgnorePkg/ s/  / /g" /etc/pacman.conf
-        echo "Pinned: \$pkg"
+    sudo grep -q "^IgnorePkg" /etc/pacman.conf || \
+        echo "IgnorePkg =" | sudo tee -a /etc/pacman.conf >/dev/null
+
+    comm -23 \
+        <(pacman -Qq | sort) \
+        <(grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sort -u | sed '/^$/d') |
+    fzf --prompt="Pin: " --height=70% --border |
+    while read -r pkg; do
+        sudo sed -i "/^IgnorePkg/ s/$/ $pkg/" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
+        echo "Pinned: $pkg"
     done
 }' | sudo tee -a "$ZSHRC"
 echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
 echo 'unpin() {
-    grep "^IgnorePkg" /etc/pacman.conf | cut -d"=" -f2 | tr " " "\n" | sed "/^$/d" | \
-    fzf --prompt="Unpin: " --height=70% --border --multi | \
-    while read pkg; do
-        sudo sed -i "/^IgnorePkg/ s/ \$pkg//g; /^IgnorePkg\$/d" /etc/pacman.conf
-        echo "Unpinned: \$pkg"
+    grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sed '/^$/d' |
+    fzf --prompt="Unpin: " --height=70% --border --multi |
+    while read -r pkg; do
+        escaped_pkg=$(printf '%s\n' "$pkg" | sed 's/[.[\*^$]/\\&/g')
+        sudo sed -i "/^IgnorePkg/ s/[[:space:]]$escaped_pkg//g" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg[[:space:]]*=[[:space:]]*$/d" /etc/pacman.conf
+        echo "Unpinned: $pkg"
     done
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
