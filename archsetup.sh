@@ -99,6 +99,14 @@ EOF
 
 echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 
+### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
+### and uncomment IgnorePkg to make pin and unpin aliases work properly ###
+
+sudo sed -i \
+  -e 's/^#\s*\(IgnorePkg\s*=.*\)/\1/' \
+  -e '/^IgnorePkg\s*=/!{/^\[options\]/a IgnorePkg =}' \
+  /etc/pacman.conf
+
 
 ### 6. Install Zsh and customizations ###
 echo "Installing zsh, oh-my-zsh, starship..."
