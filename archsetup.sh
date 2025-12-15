@@ -117,7 +117,7 @@ END {
 # Uncommenting IgnorePkg in /etc/pacman.conf to make pin and unpin aliases work properly
 sudo sed -i \
   -e 's/^#\s*\(IgnorePkg\s*=.*\)/\1/' \
-  -e '/^IgnorePkg\s*=/!{/^\[options\]/a IgnorePkg =}' \
+  -e '/^\[options\]/,/^\[/{/^\s*IgnorePkg\s*=/b}; /^\[options\]/a IgnorePkg =' \
   /etc/pacman.conf
 
 
