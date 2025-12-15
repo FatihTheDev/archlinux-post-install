@@ -101,9 +101,9 @@ echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 
 ### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
 
-# uncommenting parallel downloads in /etc/pacman.conf
+# Uncommenting parallel downloads in /etc/pacman.conf
 sudo sed -i 's/^#\s*\(ParallelDownloads\s*=\s*[0-9]*\)/\1/' /etc/pacman.conf
-# uncommenting MAKEFLAGS to use number of threads available on device in /etc/makepkg.conf
+# Uncommenting MAKEFLAGS to use number of threads available on device in /etc/makepkg.conf
 threads=$(nproc --all)
 sudo awk -v threads="$threads" '
 /^#\s*MAKEFLAGS=/ { sub(/#.*/, "MAKEFLAGS=\"-j" threads "\""); found=1 }
