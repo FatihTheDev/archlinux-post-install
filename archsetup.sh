@@ -170,6 +170,7 @@ echo 'pin() {
         echo "Pinned: $pkg"
     done
 }' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
 echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
 echo 'unpin() {
     grep "^IgnorePkg" /etc/pacman.conf |
@@ -189,7 +190,7 @@ echo 'unpin() {
 
         echo "Unpinned: $pkg"
     done
-
+echo '' | sudo tee -a "$ZSHRC"
     # If IgnorePkg exists but has no packages, force it to be exactly `IgnorePkg =`
     sudo sed -i 's/^IgnorePkg[[:space:]]*=[[:space:]]*$/IgnorePkg =/' /etc/pacman.conf
 }' | sudo tee -a "$ZSHRC"
