@@ -157,50 +157,32 @@ echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Remove selected files' | sudo tee -a "$ZSHRC"
 echo 'removefiles() {
-  local pattern="$1" dir selected
-
-  if [[ -z "$pattern" ]]; then
+  local pattern="\$1" dir selected
+  if [[ -z "\$pattern" ]]; then
     echo "Usage: removefiles <pattern>"
     return 1
   fi
-
   echo "Delete from:"
   echo "1) Root directory (/)"
   echo "2) Specific directory (choose with fzf)"
-
   read "choice?Choice (1/2): "
-
-  case "$choice" in
+  case "\$choice" in
     2)
-      dir=$(find / -type d -maxdepth 3 2>/dev/null \
-        | fzf --prompt="Select directory: " --height=50%)
-      dir="${dir:-/}"
+      dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --prompt="Select directory: " --height=50%)
+      dir="\${dir:-/}"
       ;;
-    1|"")
-      dir="/"
-      ;;
-    *)
-      echo "Invalid choice. Using root."
-      dir="/"
-      ;;
+    1|"") dir="/" ;;
+    *) echo "Invalid choice. Using root."; dir="/" ;;
   esac
-
   while true; do
-    files=$(fd -HI --absolute-path "$pattern" "$dir")
-    [[ -z "$files" ]] && { echo "No matching files left."; break; }
-
-    # Launch fzf for selection (no query persistence)
-    selected=$(printf '%s\n' "$files" \
-      | fzf --prompt="Select a file to delete (Esc to exit): " --height=70% --ansi)
-
-    # Exit if user cancels
-    [[ -z "$selected" ]] && break
-
-    # Delete the selected file and show feedback
-    if sudo rm "$selected"; then
-      echo "removed $selected"
+    files=$(fd -HI --absolute-path "\$pattern" "\$dir")
+    [[ -z "\$files" ]] && { echo "No matching files left."; break; }
+    selected=$(printf "%s\n" "\$files" | fzf --prompt="Select a file to delete (Esc to exit): " --height=70% --ansi)
+    [[ -z "\$selected" ]] && break
+    if sudo rm "\$selected"; then
+      echo "removed \$selected"
     else
-      echo "Failed to remove $selected"
+      echo "Failed to remove \$selected"
     fi
   done
 }' | sudo tee -a "$ZSHRC"
@@ -208,35 +190,25 @@ echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Search files with fd' | sudo tee -a "$ZSHRC"
 echo 'search() {
-  local pattern="$1" dir
-
-  if [[ -z "$pattern" ]]; then
+  local pattern="\$1" dir
+  if [[ -z "\$pattern" ]]; then
     echo "Usage: search <pattern>"
     return 1
   fi
-
   echo "Search from:"
   echo "1) Root directory (/)"
   echo "2) Specific directory (choose with fzf)"
-
   read "choice?Choice (1/2): "
-
-  case "$choice" in
+  case "\$choice" in
     2)
       dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --prompt="Select directory: " --height=50%)
-      dir="${dir:-/}"
+      dir="\${dir:-/}"
       ;;
-    1|"")
-      dir="/"
-      ;;
-    *)
-      echo "Invalid choice. Using root."
-      dir="/"
-      ;;
+    1|"") dir="/" ;;
+    *) echo "Invalid choice. Using root."; dir="/" ;;
   esac
-
-  echo "Searching for '$pattern' in $dir..."
-  fd -HI --absolute-path "$pattern" "$dir" 2>/dev/null
+  echo "Searching for \"\$pattern\" in \$dir..."
+  fd -HI --absolute-path "\$pattern" "\$dir" 2>/dev/null
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
@@ -247,12 +219,12 @@ echo 'pin() {
 
     comm -23 \
         <(pacman -Qq | sort) \
-        <(grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sort -u | sed '/^$/d') |
+        <(grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sort -u | sed "/^$/d") |
     fzf --prompt="Pin: " --height=70% --border |
     while read -r pkg; do
-        sudo sed -i "/^IgnorePkg/ s/$/ $pkg/" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg/ s/$/ \$pkg/" /etc/pacman.conf
         sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
-        echo "Pinned: $pkg"
+        echo "Pinned: \$pkg"
     done
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
@@ -261,23 +233,16 @@ echo 'unpin() {
     grep "^IgnorePkg" /etc/pacman.conf |
         cut -d= -f2 |
         tr " " "\n" |
-        sed '/^$/d' |
+        sed "/^$/d" |
         fzf --prompt="Unpin: " --height=70% --border --multi |
     while read -r pkg; do
-        escaped_pkg=$(printf '%s\n' "$pkg" | sed 's/[.[\*^$]/\\&/g')
-
-        # Remove the package from IgnorePkg
-        sudo sed -i "/^IgnorePkg/ s/[[:space:]]$escaped_pkg//g" /etc/pacman.conf
-
-        # Normalize spacing and ensure directive remains
+        escaped_pkg=$(printf "%s\n" "\$pkg" | sed "s/[.[\*^$]/\\\\&/g")
+        sudo sed -i "/^IgnorePkg/ s/[[:space:]]\$escaped_pkg//g" /etc/pacman.conf
         sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
-        sudo sed -i "/^IgnorePkg[[:space:]]*=/ s/$//" /etc/pacman.conf
-
-        echo "Unpinned: $pkg"
+        sudo sed -i "/^IgnorePkg[[:space:]]*=/ s/\$//" /etc/pacman.conf
+        echo "Unpinned: \$pkg"
     done
-echo '' | sudo tee -a "$ZSHRC"
-    # If IgnorePkg exists but has no packages, force it to be exactly `IgnorePkg =`
-    sudo sed -i 's/^IgnorePkg[[:space:]]*=[[:space:]]*$/IgnorePkg =/' /etc/pacman.conf
+    sudo sed -i "s/^IgnorePkg[[:space:]]*=[[:space:]]*$/IgnorePkg =/" /etc/pacman.conf
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
