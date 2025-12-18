@@ -135,11 +135,11 @@ sudo -u "$USER_NAME" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyz
 # Ensure .config exists
 sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
 
-# Add Starship init
-sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
-
 # Add zsh-syntax-highlighting
 echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
+
+# Add Starship init
+sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
 
 # Aliases
 echo 'alias ll="ls -l"' | sudo tee -a "$ZSHRC"
@@ -153,6 +153,91 @@ echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (you can remove the backslashes)' | sudo tee -a "$ZSHRC"
 echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
+echo '# Remove selected files' | sudo tee -a "$ZSHRC"
+echo 'removefiles() {
+  local pattern="$1" dir selected
+
+  if [[ -z "$pattern" ]]; then
+    echo "Usage: removefiles <pattern>"
+    return 1
+  fi
+
+  echo "Delete from:"
+  echo "1) Root directory (/)"
+  echo "2) Specific directory (choose with fzf)"
+
+  read "choice?Choice (1/2): "
+
+  case "$choice" in
+    2)
+      dir=$(find / -type d -maxdepth 3 2>/dev/null \
+        | fzf --prompt="Select directory: " --height=50%)
+      dir="${dir:-/}"
+      ;;
+    1|"")
+      dir="/"
+      ;;
+    *)
+      echo "Invalid choice. Using root."
+      dir="/"
+      ;;
+  esac
+
+  while true; do
+    files=$(fd -HI --absolute-path "$pattern" "$dir")
+    [[ -z "$files" ]] && { echo "No matching files left."; break; }
+
+    # Launch fzf for selection (no query persistence)
+    selected=$(printf '%s\n' "$files" \
+      | fzf --prompt="Select a file to delete (Esc to exit): " --height=70% --ansi)
+
+    # Exit if user cancels
+    [[ -z "$selected" ]] && break
+
+    # Delete the selected file and show feedback
+    if sudo rm "$selected"; then
+      echo "removed $selected"
+    else
+      echo "Failed to remove $selected"
+    fi
+  done
+}' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
+echo '# Search files with fd' | sudo tee -a "$ZSHRC"
+echo 'search() {
+  local pattern="$1" dir
+
+  if [[ -z "$pattern" ]]; then
+    echo "Usage: search <pattern>"
+    return 1
+  fi
+
+  echo "Search from:"
+  echo "1) Root directory (/)"
+  echo "2) Specific directory (choose with fzf)"
+
+  read "choice?Choice (1/2): "
+
+  case "$choice" in
+    2)
+      dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --prompt="Select directory: " --height=50%)
+      dir="${dir:-/}"
+      ;;
+    1|"")
+      dir="/"
+      ;;
+    *)
+      echo "Invalid choice. Using root."
+      dir="/"
+      ;;
+  esac
+
+  echo "Searching for '$pattern' in $dir..."
+  fd -HI --absolute-path "$pattern" "$dir" 2>/dev/null
+}' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Pin a package (add to IgnorePkg)' | sudo tee -a "$ZSHRC"
