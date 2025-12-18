@@ -168,7 +168,7 @@ echo 'removefiles() {
   echo "1) Root directory (/)"
   echo "2) Specific directory (choose with fzf)"
 
-  read "choice?Choice (1/2): "
+  read -r choice || choice=""
 
   case "$choice" in
     2)
@@ -219,7 +219,7 @@ echo 'search() {
   echo "1) Root directory (/)"
   echo "2) Specific directory (choose with fzf)"
 
-  read "choice?Choice (1/2): "
+  read -r choice || choice=""
 
   case "$choice" in
     2)
