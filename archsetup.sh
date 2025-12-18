@@ -158,33 +158,22 @@ echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Remove selected files' | sudo tee -a "$ZSHRC"
 echo 'removefiles() {
-  local pattern="\$1" dir selected
-  if [[ -z "\$pattern" ]]; then
+  local pattern="$1" dir selected
+  if [[ -z "$pattern" ]]; then
     echo "Usage: removefiles <pattern>"
     return 1
   fi
-  echo "Delete from:"
-  echo "1) Root directory (/)"
-  echo "2) Specific directory (choose with fzf)"
-  read "choice?Choice (1/2): "
-  case "\$choice" in
-    2)
-      dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --prompt="Select directory: " --height=50%)
-      dir="\${dir:-/}"
-      ;;
-    1|"") dir="/" ;;
-    *) echo "Invalid choice. Using root."; dir="/" ;;
+  read "choice?Search (1) Root (2) Custom: "
+  case "$choice" in
+    2) dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf); dir="${dir:-/}" ;;
+    *) dir="/" ;;
   esac
   while true; do
-    files=$(fd -HI --absolute-path "\$pattern" "\$dir")
-    [[ -z "\$files" ]] && { echo "No matching files left."; break; }
-    selected=$(printf "%s\n" "\$files" | fzf --prompt="Select a file to delete (Esc to exit): " --height=70% --ansi)
-    [[ -z "\$selected" ]] && break
-    if sudo rm "\$selected"; then
-      echo "removed \$selected"
-    else
-      echo "Failed to remove \$selected"
-    fi
+    files=$(fd -HI --absolute-path "$pattern" "$dir")
+    [[ -z "$files" ]] && break
+    selected=$(printf "%s\n" "$files" | fzf --prompt="Delete: " --ansi)
+    [[ -z "$selected" ]] && break
+    sudo rm "$selected" && echo "Removed $selected"
   done
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
