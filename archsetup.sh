@@ -157,7 +157,7 @@ echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Remove selected files' | sudo tee -a "$ZSHRC"
 echo 'removefiles() {
-  local pattern="${1:-}" dir selected
+  local pattern="$1" dir selected
 
   if [[ -z "$pattern" ]]; then
     echo "Usage: removefiles <pattern>"
@@ -168,7 +168,7 @@ echo 'removefiles() {
   echo "1) Root directory (/)"
   echo "2) Specific directory (choose with fzf)"
 
-  read -r choice || choice=""
+  read "choice?Choice (1/2): "
 
   case "$choice" in
     2)
@@ -208,7 +208,7 @@ echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Search files with fd' | sudo tee -a "$ZSHRC"
 echo 'search() {
-  local pattern="${1:-}" dir
+  local pattern="$1" dir
 
   if [[ -z "$pattern" ]]; then
     echo "Usage: search <pattern>"
@@ -219,7 +219,7 @@ echo 'search() {
   echo "1) Root directory (/)"
   echo "2) Specific directory (choose with fzf)"
 
-  read -r choice || choice=""
+  read "choice?Choice (1/2): "
 
   case "$choice" in
     2)
