@@ -115,10 +115,11 @@ END {
 ' /etc/makepkg.conf > /tmp/makepkg.conf && sudo mv /tmp/makepkg.conf /etc/makepkg.conf 
 
 # Uncommenting IgnorePkg in /etc/pacman.conf to make pin and unpin aliases work properly
-sudo sed -i \
-  -e 's/^#\s*\(IgnorePkg\s*=.*\)/\1/' \
-  -e '/^\[options\]/,/^\[/{/^\s*IgnorePkg\s*=/b}; /^\[options\]/a IgnorePkg =' \
-  /etc/pacman.conf
+sudo sed -i 's/^#\s*IgnorePkg\s*=/IgnorePkg =/' /etc/pacman.conf
+# If IgnorePkg still doesn't exist at all under [options], add it once
+if ! grep -q "^IgnorePkg\s*=" /etc/pacman.conf; then
+    sudo sed -i '/^\[options\]/a IgnorePkg =' /etc/pacman.conf
+fi
 
 
 ### 7. Install Zsh and customizations ###
@@ -190,8 +191,8 @@ echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Search files with fd' | sudo tee -a "$ZSHRC"
 echo 'search() {
-  local pattern="\$1" dir
-  if [[ -z "\$pattern" ]]; then
+  local pattern="$1" dir
+  if [[ -z "$pattern" ]]; then
     echo "Usage: search <pattern>"
     return 1
   fi
@@ -199,48 +200,41 @@ echo 'search() {
   echo "1) Root directory (/)"
   echo "2) Specific directory (choose with fzf)"
   read "choice?Choice (1/2): "
-  case "\$choice" in
+  case "$choice" in
     2)
       dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --prompt="Select directory: " --height=50%)
-      dir="\${dir:-/}"
+      dir="${dir:-/}"
       ;;
     1|"") dir="/" ;;
     *) echo "Invalid choice. Using root."; dir="/" ;;
   esac
-  echo "Searching for \"\$pattern\" in \$dir..."
-  fd -HI --absolute-path "\$pattern" "\$dir" 2>/dev/null
+  echo "Searching for \"$pattern\" in $dir..."
+  fd -HI --absolute-path "$pattern" "$dir" 2>/dev/null
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
 echo '# Pin a package (add to IgnorePkg)' | sudo tee -a "$ZSHRC"
 echo 'pin() {
-    sudo grep -q "^IgnorePkg" /etc/pacman.conf || \
-        echo "IgnorePkg =" | sudo tee -a /etc/pacman.conf >/dev/null
-
-    comm -23 \
-        <(pacman -Qq | sort) \
-        <(grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sort -u | sed "/^$/d") |
-    fzf --prompt="Pin: " --height=70% --border |
+    sudo grep -q "^IgnorePkg" /etc/pacman.conf || echo "IgnorePkg =" | sudo tee -a /etc/pacman.conf >/dev/null
+    comm -23 <(pacman -Qq | sort) <(grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sort -u | sed "/^$/d") | \
+    fzf --prompt="Pin: " --height=70% --border | \
     while read -r pkg; do
-        sudo sed -i "/^IgnorePkg/ s/$/ \$pkg/" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg/ s/$/ $pkg/" /etc/pacman.conf
         sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
-        echo "Pinned: \$pkg"
+        echo "Pinned: $pkg"
     done
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
 echo 'unpin() {
-    grep "^IgnorePkg" /etc/pacman.conf |
-        cut -d= -f2 |
-        tr " " "\n" |
-        sed "/^$/d" |
-        fzf --prompt="Unpin: " --height=70% --border --multi |
+    grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sed "/^$/d" | \
+    fzf --prompt="Unpin: " --height=70% --border --multi | \
     while read -r pkg; do
-        escaped_pkg=$(printf "%s\n" "\$pkg" | sed "s/[.[\*^$]/\\\\&/g")
-        sudo sed -i "/^IgnorePkg/ s/[[:space:]]\$escaped_pkg//g" /etc/pacman.conf
+        escaped_pkg=$(printf "%s\n" "$pkg" | sed "s/[.[\*^$]/\\\\&/g")
+        sudo sed -i "/^IgnorePkg/ s/[[:space:]]$escaped_pkg//g" /etc/pacman.conf
         sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
-        sudo sed -i "/^IgnorePkg[[:space:]]*=/ s/\$//" /etc/pacman.conf
-        echo "Unpinned: \$pkg"
+        sudo sed -i "/^IgnorePkg[[:space:]]*=/ s/$//" /etc/pacman.conf
+        echo "Unpinned: $pkg"
     done
     sudo sed -i "s/^IgnorePkg[[:space:]]*=[[:space:]]*$/IgnorePkg =/" /etc/pacman.conf
 }' | sudo tee -a "$ZSHRC"
