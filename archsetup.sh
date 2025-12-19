@@ -165,15 +165,15 @@ echo 'removefiles() {
   fi
   read "choice?Search (1) Root (2) Custom: "
   case "$choice" in
-    2) dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf); dir="${dir:-/}" ;;
+    2) dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --height 70% --border); dir="${dir:-/}" ;;
     *) dir="/" ;;
   esac
   while true; do
-    files=$(fd -HI --absolute-path "$pattern" "$dir")
+    files=$(fd -HI --absolute-path -t d -t f "$pattern" "$dir")
     [[ -z "$files" ]] && break
-    selected=$(printf "%s\n" "$files" | fzf --prompt="Delete: " --ansi)
+    selected=$(printf "%s\n" "$files" | fzf --height 70% --border --prompt="Delete: " --ansi)
     [[ -z "$selected" ]] && break
-    sudo rm "$selected" && echo "Removed $selected"
+    sudo rm -rf "$selected" && echo "Removed $selected"
   done
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
