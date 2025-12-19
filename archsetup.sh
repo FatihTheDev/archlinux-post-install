@@ -159,22 +159,52 @@ echo '' | sudo tee -a "$ZSHRC"
 echo '# Remove selected files' | sudo tee -a "$ZSHRC"
 echo 'removefiles() {
   local pattern="$1" dir selected
-  if [[ -z "$pattern" ]]; then
+
+  [[ -z "$pattern" ]] && {
     echo "Usage: removefiles <pattern>"
     return 1
-  fi
+  }
+
   read "choice?Search (1) Root (2) Custom: "
   case "$choice" in
-    2) dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --height 70% --border); dir="${dir:-/}" ;;
+    2)
+      dir=$(find / -maxdepth 3 -type d 2>/dev/null |
+            fzf --height 70% --border)
+      dir="${dir:-/}"
+      ;;
     *) dir="/" ;;
   esac
-  while true; do
-    files=$(fd -HI --absolute-path -t d -t f "$pattern" "$dir")
-    [[ -z "$files" ]] && break
-    selected=$(printf "%s\n" "$files" | fzf --height 70% --border --prompt="Delete: " --ansi)
-    [[ -z "$selected" ]] && break
-    sudo rm -rf "$selected" && echo "Removed $selected"
-  done
+
+  selected=$(
+    fd -HI --absolute-path -t f -t d "$pattern" "$dir" 2>/dev/null |
+      fzf --multi \
+          --height 70% \
+          --bind "tab:toggle" \
+          --border \
+          --prompt="Select> " \
+          --header="TAB = select/unselect | ENTER = confirm | ESC = cancel"
+  )
+
+  [[ -z "$selected" ]] && {
+    echo "No files selected."
+    return 0
+  }
+
+  echo
+  echo "The following items will be deleted:"
+  echo "------------------------------------"
+  printf '%s\n' "$selected"
+  echo "------------------------------------"
+
+  read "confirm?Proceed with deletion? [y/N]: "
+  [[ "$confirm" != [yY] ]] && {
+    echo "Aborted."
+    return 0
+  }
+
+  printf '%s\n' "$selected" | sudo xargs -r rm -rf
+
+  echo "Bulk deletion complete."
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
