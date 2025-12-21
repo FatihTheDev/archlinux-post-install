@@ -156,6 +156,9 @@ echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United St
 echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
+echo '# Disable sleep when AUR package is being built' | sudo tee -a "$ZSHRC"
+echo 'alias yay="systemd-inhibit --what=sleep --who=yay --why=\"AUR build in progress\" yay"' | sudo tee -a "$ZSHRC"  
+
 echo '# Remove selected files' | sudo tee -a "$ZSHRC"
 echo 'removefiles() {
   local pattern="$1" dir selected
