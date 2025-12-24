@@ -264,7 +264,7 @@ echo '' | sudo tee -a "$ZSHRC"
 
 # For theme customizations
 echo '#For theming the syntax highlighting' | sudo tee -a "$ZSHRC"
-echo '[ -f ~/.config/zsh_syntax_theme ] && source ~/.config/zsh_syntax_theme' | sudo tee -a "$ZSHRC"
+echo '[ -f ~/.config/zsh_theme_sync ] && source ~/.config/zsh_theme_sync' | sudo tee -a "$ZSHRC"
 
 # Set default shell to zsh
 sudo chsh -s /bin/zsh "$USER_NAME"
