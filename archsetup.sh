@@ -262,6 +262,9 @@ echo 'unpin() {
 }' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
+echo 'source ~/.local/bin/theme-env.sh' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
 # For theme customizations
 echo '#For theming the syntax highlighting' | sudo tee -a "$ZSHRC"
 echo '[ -f ~/.config/zsh_theme_sync ] && source ~/.config/zsh_theme_sync' | sudo tee -a "$ZSHRC"
