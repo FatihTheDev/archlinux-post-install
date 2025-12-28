@@ -275,6 +275,14 @@ sudo chsh -s /bin/zsh "$USER_NAME"
 # Fix permissions
 sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 
+# Disabling starship timeout warnings 
+mkdir -p ~/.config/
+
+cat > ~/.config/starship.toml <<'EOF'
+# Disable timeout warnings by setting a very high value (in milliseconds)
+scan_timeout = 10000
+EOF
+
 
 ### 8. Kernel headers installation ###
 current_kernel=$(uname -r)
