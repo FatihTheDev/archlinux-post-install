@@ -99,24 +99,7 @@ EOF
 
 echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 
-### 6. Prompt for Proton VPN setup ###
-if ask_yn "Set up ProtonVPN GUI?"; then
-    USER_NAME=$(logname)
-    USER_HOME=$(eval echo "~$USER_NAME")
-    sudo pacman -S proton-vpn-gtk-app
-    
-    mkdir -p $USER_HOME/.config/Proton/VPN
-    
-cat > $USER_HOME/.config/Proton/VPN/app-config.json <<'EOF'
-{
-    "tray_pinned_servers": [],
-    "connect_at_app_startup": "FASTEST",
-    "start_app_minimized": false
-}
-EOF
-fi
-
-### 7. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
+### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
 echo "Enabling parallel downloads and parallel compilation..."
 # Uncommenting parallel downloads in /etc/pacman.conf
 sudo sed -i 's/^#\s*\(ParallelDownloads\s*=\s*[0-9]*\)/\1/' /etc/pacman.conf
@@ -139,7 +122,7 @@ if ! grep -q "^IgnorePkg\s*=" /etc/pacman.conf; then
 fi
 
 
-### 8. Install Zsh and customizations ###
+### 7. Install Zsh and customizations ###
 echo "Installing zsh, oh-my-zsh, starship..."
 sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
@@ -301,7 +284,7 @@ scan_timeout = 10000
 EOF
 
 
-### 9. Kernel headers installation ###
+### 8. Kernel headers installation ###
 current_kernel=$(uname -r)
 suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
 
@@ -319,7 +302,7 @@ else
 fi
 
 
-### 10. Virtualization setup ###
+### 9. Virtualization setup ###
     while true; do
         read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice < /dev/tty
         case "$qemu_choice" in
