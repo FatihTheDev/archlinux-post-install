@@ -101,11 +101,13 @@ echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
 
 ### 6. Prompt for Proton VPN setup ###
 if ask_yn "Set up ProtonVPN GUI?"; then
+    USER_NAME=$(logname)
+    USER_HOME=$(eval echo "~$USER_NAME")
     sudo pacman -S proton-vpn-gtk-app
     
-    mkdir -p ~/.config/Proton/VPN
+    mkdir -p $USER_HOME/.config/Proton/VPN
     
-cat > ~/.config/Proton/VPN/app-config.json <<'EOF'
+cat > $USER_HOME/.config/Proton/VPN/app-config.json <<'EOF'
 {
     "tray_pinned_servers": [],
     "connect_at_app_startup": "FASTEST",
