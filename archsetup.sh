@@ -1,167 +1,329 @@
 #!/bin/bash
+set -euo pipefail
 
-# Define Colors
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RED='\033[0;31m'
-NC='\033[0m'
+echo "Updating system..."
+sudo pacman -Syu --noconfirm
 
-echo -e "${BLUE}=== Archinstall Auto-Wrapper ===${NC}"
-echo -e "${GREEN}Updating archinstall to latest version...${NC}"
-pip install --upgrade archinstall &>/dev/null
+### Helper function for yes/no prompt ###
+ask_yn() {
+    local prompt="$1"
+    local response
+    while true; do
+        read -rp "$prompt [y/n]: " response < /dev/tty
+        case "$response" in
+            [Yy]) return 0 ;;
+            [Nn]) return 1 ;;
+            *) echo "Please enter y or n." ;;
+        esac
+    done
+}
 
-# ----------------------------------
-# 1. GATHER USER INPUTS
-# ----------------------------------
+### 0. Installing basic tools ###
+echo "Installing basic system tools..."
+sudo pacman -S --noconfirm man unzip tldr flatpak
 
-# Get Credentials
-echo -e "\n${BLUE}--- User Configuration ---${NC}"
-read -p "Username: " USER_NAME
-read -s -p "User Password: " USER_PASS
-echo ""
-read -s -p "Root Password: " ROOT_PASS
-echo ""
+### 1. Install grub-btrfs with Timeshift support ###
+echo "Installing grub-btrfs..."
+sudo pacman -S --noconfirm timeshift grub-btrfs
 
-# Get GPU Choice
-echo -e "\n${BLUE}--- Hardware Setup ---${NC}"
-echo "Select your GPU Driver:"
-echo "1) AMD (mesa)"
-echo "2) Intel (mesa)"
-echo "3) NVIDIA (Proprietary)"
-echo "4) VMware/VirtualBox"
-read -p "Choice [1-4]: " GPU_CHOICE
+echo "Configuring grub-btrfsd to use Timeshift..."
+sudo cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
+sudo sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
 
-# Map GPU choice to packages
-case $GPU_CHOICE in
-    1) GPU_DRIVER="amd";;
-    2) GPU_DRIVER="intel";;
-    3) GPU_DRIVER="nvidia";;
-    4) GPU_DRIVER="all-open";; # Fallback for VMs
-    *) GPU_DRIVER="all-open";;
-esac
+sudo systemctl daemon-reload
+sudo systemctl enable --now grub-btrfsd.service
 
-# Get Desktop Environment (Optional, but usually needed with GPU)
-echo -e "\n${BLUE}--- Software Setup ---${NC}"
-echo "Select Desktop Profile:"
-echo "1) KDE Plasma"
-echo "2) Gnome"
-echo "3) Hyprland"
-echo "4) Minimal (CLI only)"
-read -p "Choice [1-4]: " DE_CHOICE
+echo "Updating grub..."
+sudo grub-mkconfig -o /boot/grub/grub.cfg
 
-case $DE_CHOICE in
-    1) PROFILE="desktop"; DE="kde";;
-    2) PROFILE="desktop"; DE="gnome";;
-    3) PROFILE="desktop"; DE="hyprland";;
-    4) PROFILE="minimal"; DE="";; 
-    *) PROFILE="minimal"; DE="";;
-esac
+### 2. Install reflector and configure fastest global mirrors (balanced) ###
+echo "Installing reflector..."
+sudo pacman -S --noconfirm reflector curl
 
-# Select Disk (Critical Step)
-echo -e "\n${BLUE}--- Disk Selection ---${NC}"
-# Use Python to reliably list disks in a format we can parse
-TARGET_DISK=$(python3 -c "
-import archinstall
-import json
-try:
-    disks = archinstall.list_drives()
-    # Create a simple menu
-    filtered_disks = [d for d in disks if d.size > 1] # Filter tiny partitions
-    for i, disk in enumerate(filtered_disks):
-        print(f'{i}) {disk.device} ({disk.size} GB)')
+REFLECTOR_OVERRIDE_DIR="/etc/systemd/system/reflector.service.d"
+sudo mkdir -p "$REFLECTOR_OVERRIDE_DIR"
+cat <<EOF | sudo tee "$REFLECTOR_OVERRIDE_DIR/override.conf"
+[Service]
+ExecStart=
+ExecStart=/usr/bin/reflector --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist
+EOF
+
+sudo systemctl daemon-reload
+# sudo systemctl enable --now reflector.timer
+# sudo systemctl enable --now reflector.service
+
+### 3. Add Chaotic AUR ###
+echo "Adding Chaotic AUR..."
+sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
+sudo pacman-key --lsign-key 3056513887B78AEB
+sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+
+if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
+    cat <<'EOF' | sudo tee -a /etc/pacman.conf
+
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+EOF
+fi
+
+echo "Refreshing system repositories..."
+sudo pacman -Sy
+
+### 4. Install yay-bin (AUR helper) from source ###
+echo "Installing yay-bin..."
+if ! command -v git &> /dev/null; then
+    sudo pacman -S --noconfirm git base-devel
+fi
+
+sudo -u $(logname) bash <<'EOF'
+cd /tmp
+git clone https://aur.archlinux.org/yay-bin.git
+cd yay-bin
+makepkg -si --noconfirm
+EOF
+
+
+### 5. Install JetBrains Mono Nerd Font ###
+echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     
-    selection = int(input('Select Target Disk Number: '))
-    print(filtered_disks[selection].device)
-except:
-    print('')
-")
+USER_NAME=$(logname)
 
-if [[ -z "$TARGET_DISK" ]]; then
-    echo -e "${RED}Invalid disk selection. Exiting.${NC}"
-    exit 1
+sudo -u "$USER_NAME" bash <<'EOF'
+mkdir -p ~/.local/share/fonts/nerd-fonts
+cd /tmp
+curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
+fc-cache -fv
+EOF
+
+echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
+
+### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
+echo "Enabling parallel downloads and parallel compilation..."
+# Uncommenting parallel downloads in /etc/pacman.conf
+sudo sed -i 's/^#\s*\(ParallelDownloads\s*=\s*[0-9]*\)/\1/' /etc/pacman.conf
+# Uncommenting MAKEFLAGS to use number of threads available on device in /etc/makepkg.conf
+threads=$(nproc --all)
+sudo awk -v threads="$threads" '
+/^#\s*MAKEFLAGS=/ { sub(/#.*/, "MAKEFLAGS=\"-j" threads "\""); found=1 }
+/^MAKEFLAGS=/ { sub(/=.*/, "=\"-j" threads "\""); found=1 }
+{ print }
+END {
+    if (!found) print "MAKEFLAGS=\"-j" threads "\""
+}
+' /etc/makepkg.conf > /tmp/makepkg.conf && sudo mv /tmp/makepkg.conf /etc/makepkg.conf 
+
+# Uncommenting IgnorePkg in /etc/pacman.conf to make pin and unpin aliases work properly
+sudo sed -i 's/^#\s*IgnorePkg\s*=/IgnorePkg =/' /etc/pacman.conf
+# If IgnorePkg still doesn't exist at all under [options], add it once
+if ! grep -q "^IgnorePkg\s*=" /etc/pacman.conf; then
+    sudo sed -i '/^\[options\]/a IgnorePkg =' /etc/pacman.conf
 fi
 
-echo -e "${GREEN}Targeting: $TARGET_DISK${NC}"
-echo -e "${RED}WARNING: THIS WILL WIPE $TARGET_DISK!${NC}"
-read -p "Type 'yes' to confirm: " CONFIRM
-if [[ "$CONFIRM" != "yes" ]]; then exit 1; fi
 
-# ----------------------------------
-# 2. GENERATE ARCHINSTALL CONFIG
-# ----------------------------------
-echo -e "\n${BLUE}Generating configuration...${NC}"
+### 7. Install Zsh and customizations ###
+echo "Installing zsh, oh-my-zsh, starship..."
+sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
-# We use Python to dump the JSON to ensure it handles the format correctly.
-# This config enables: Btrfs (default compression), NetworkManager, Pipewire, etc.
-python3 -c "
-import json
+USER_NAME=$(logname)
+USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
+ZSHRC="$USER_HOME/.zshrc"
 
-config = {
-    'version': '2.5.0',
-    'archinstall-language': 'English',
-    'keyboard-layout': 'us',
-    'mirror-region': {'United States': 10, 'Germany': 10}, 
-    'sys-language': 'en_US.UTF-8',
-    'sys-encoding': 'UTF-8',
-    'profile': {
-        'path': '$PROFILE',
-        'details': ['$DE'] if '$DE' else []
-    },
-    'dry-run': False,
-    'harddrives': ['$TARGET_DISK'],
-    'disk_layout': {
-        'config_type': 'default_layout',
-        'filesystem_type': 'btrfs'
-    },
-    'gfx_driver': '$GPU_DRIVER',
-    'audio': 'pipewire',
-    'kernels': ['linux'],
-    'packages': [
-        'vim', 'git', 'wget', 'neofetch', 'firefox'
-    ],
-    'network_config': {
-        'type': 'nm'
-    },
-    'timezone': 'UTC',
-    'ntp': True
-}
+# Install Oh-My-Zsh unattended
+sudo -u "$USER_NAME" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 
-# Creds are handled separately in newer archinstall versions, 
-# but putting them in config is supported for silent automation.
-creds = {
-    '!users': [
-        {
-            'username': '$USER_NAME',
-            'password': '$USER_PASS',
-            'sudo': True
-        }
-    ],
-    '!root_password': '$ROOT_PASS'
-}
+# Ensure .config exists
+sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
 
-# Merge creds into config for simplicity
-config.update(creds)
+# Add zsh-syntax-highlighting
+echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
 
-with open('auto_config.json', 'w') as f:
-    json.dump(config, f, indent=4)
-"
+# Add Starship init
+sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
 
-# ----------------------------------
-# 3. RUN ARCHINSTALL
-# ----------------------------------
+# Aliases
+echo 'alias ll="ls -l"' | sudo tee -a "$ZSHRC"
+echo 'alias la="ls -a"' | sudo tee -a "$ZSHRC"
+echo 'alias l="ls -la"' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
 
-echo -e "\n${GREEN}Starting Automated Install...${NC}"
-echo "Sit back and relax. Archinstall is taking over."
-echo "Logs are available at /var/log/archinstall/install.log"
+echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC"
+echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
 
-# Run archinstall in silent mode using the generated config
-archinstall --config auto_config.json --silent
+echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (you can remove the backslashes)' | sudo tee -a "$ZSHRC"
+echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
 
-if [[ $? -eq 0 ]]; then
-    echo -e "\n${GREEN}Installation Complete!${NC}"
-    # Clean up the config file containing passwords
-    rm auto_config.json
-    echo "You can now reboot."
+echo '# Disable sleep when AUR package is being built' | sudo tee -a "$ZSHRC"
+echo 'alias yay="systemd-inhibit --what=sleep --who=yay --why=\"AUR build in progress\" yay"' | sudo tee -a "$ZSHRC"  
+
+echo '# Remove selected files' | sudo tee -a "$ZSHRC"
+echo 'removefiles() {
+  local pattern="$1" dir selected
+
+  [[ -z "$pattern" ]] && {
+    echo "Usage: removefiles <pattern>"
+    return 1
+  }
+
+  read "choice?Search (1) Root (2) Custom: "
+  case "$choice" in
+    2)
+      dir=$(find / -maxdepth 3 -type d 2>/dev/null |
+            fzf --height 70% --border)
+      dir="${dir:-/}"
+      ;;
+    *) dir="/" ;;
+  esac
+
+  selected=$(
+    fd -HI --absolute-path -t f -t d "$pattern" "$dir" 2>/dev/null |
+      fzf --multi \
+          --height 70% \
+          --bind "tab:toggle" \
+          --border \
+          --prompt="Select> " \
+          --header="TAB = select/unselect | ENTER = confirm | ESC = cancel"
+  )
+
+  [[ -z "$selected" ]] && {
+    echo "No files selected."
+    return 0
+  }
+
+  echo
+  echo "The following items will be deleted:"
+  echo "------------------------------------"
+  printf '%s\n' "$selected"
+  echo "------------------------------------"
+
+  read "confirm?Proceed with deletion? [y/N]: "
+  [[ "$confirm" != [yY] ]] && {
+    echo "Aborted."
+    return 0
+  }
+
+  printf '%s\n' "$selected" | sudo xargs -r rm -rf
+
+  echo "Bulk deletion complete."
+}' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
+echo '# Search files with fd' | sudo tee -a "$ZSHRC"
+echo 'search() {
+  local pattern="$1" dir
+  if [[ -z "$pattern" ]]; then
+    echo "Usage: search <pattern>"
+    return 1
+  fi
+  echo "Search from:"
+  echo "1) Root directory (/)"
+  echo "2) Specific directory (choose with fzf)"
+  read "choice?Choice (1/2): "
+  case "$choice" in
+    2)
+      dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --prompt="Select directory: " --height=50%)
+      dir="${dir:-/}"
+      ;;
+    1|"") dir="/" ;;
+    *) echo "Invalid choice. Using root."; dir="/" ;;
+  esac
+  echo "Searching for \"$pattern\" in $dir..."
+  fd -HI --absolute-path "$pattern" "$dir" 2>/dev/null
+}' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
+echo '# Pin a package (add to IgnorePkg)' | sudo tee -a "$ZSHRC"
+echo 'pin() {
+    sudo grep -q "^IgnorePkg" /etc/pacman.conf || echo "IgnorePkg =" | sudo tee -a /etc/pacman.conf >/dev/null
+    comm -23 <(pacman -Qq | sort) <(grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sort -u | sed "/^$/d") | \
+    fzf --prompt="Pin: " --height=70% --border | \
+    while read -r pkg; do
+        sudo sed -i "/^IgnorePkg/ s/$/ $pkg/" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
+        echo "Pinned: $pkg"
+    done
+}' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
+echo 'unpin() {
+    grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sed "/^$/d" | \
+    fzf --prompt="Unpin: " --height=70% --border --multi | \
+    while read -r pkg; do
+        escaped_pkg=$(printf "%s\n" "$pkg" | sed "s/[.[\*^$]/\\\\&/g")
+        sudo sed -i "/^IgnorePkg/ s/[[:space:]]$escaped_pkg//g" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
+        sudo sed -i "/^IgnorePkg[[:space:]]*=/ s/$//" /etc/pacman.conf
+        echo "Unpinned: $pkg"
+    done
+    sudo sed -i "s/^IgnorePkg[[:space:]]*=[[:space:]]*$/IgnorePkg =/" /etc/pacman.conf
+}' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
+echo 'source ~/.local/bin/theme-env.sh' | sudo tee -a "$ZSHRC"
+echo '' | sudo tee -a "$ZSHRC"
+
+# For theme customizations
+echo '#For theming the syntax highlighting' | sudo tee -a "$ZSHRC"
+echo '[ -f ~/.config/zsh_theme_sync ] && source ~/.config/zsh_theme_sync' | sudo tee -a "$ZSHRC"
+
+# Set default shell to zsh
+sudo chsh -s /bin/zsh "$USER_NAME"
+
+# Fix permissions
+sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
+
+# Disabling starship timeout warnings 
+mkdir -p ~/.config/
+
+cat > ~/.config/starship.toml <<'EOF'
+# Disable timeout warnings by setting a very high value (in milliseconds)
+scan_timeout = 10000
+EOF
+
+
+### 8. Kernel headers installation ###
+current_kernel=$(uname -r)
+suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
+
+if [[ "$suffix" == *"arch"* ]]; then
+    sudo pacman -S --noconfirm linux-headers
+elif [[ "$suffix" == *"lts"* ]]; then
+        sudo pacman -S --noconfirm linux-lts-headers
+elif [[ "$suffix" == *"zen"* ]]; then
+    sudo pacman -S --noconfirm linux-zen-headers
+elif [[ "$suffix" == *"hardened"* ]]; then
+    sudo pacman -S --noconfirm linux-hardened-headers
 else
-    echo -e "\n${RED}Installation Failed. Check logs.${NC}"
+    echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
+    echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
 fi
+
+
+### 9. Virtualization setup ###
+    while true; do
+        read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice < /dev/tty
+        case "$qemu_choice" in
+            full) qemu_pkg="qemu-full"; break ;;
+            desktop) qemu_pkg="qemu-desktop"; break ;;
+            *) echo "Please enter 'full' or 'desktop'." ;;
+        esac
+    done
+
+    echo "Installing virtualization packages..."
+    sudo pacman -S --noconfirm libvirt virt-manager "$qemu_pkg" dnsmasq dmidecode
+
+    echo "Enabling virtualization services..."
+    sudo systemctl enable --now libvirtd.service virtlogd.service
+
+    echo "Adding user to libvirt and kvm groups..."
+    sudo usermod -aG libvirt $(logname)
+    sudo usermod -aG kvm $(logname)
+
+    echo "Autostarting default libvirt network..."
+    sudo virsh net-autostart default
+    
+
+echo "All tasks completed successfully! Please reboot to apply all changes."
