@@ -1,329 +1,566 @@
 #!/bin/bash
-set -euo pipefail
 
-echo "Updating system..."
-sudo pacman -Syu --noconfirm
+set -e
+set -o pipefail
 
-### Helper function for yes/no prompt ###
-ask_yn() {
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+    echo -e "${RED}This script must be run as root${NC}" 
+    exit 1
+fi
+
+# Check if we're in Arch Linux live environment
+if ! command -v pacman >/dev/null 2>&1; then
+    echo -e "${RED}Error: This script must be run from Arch Linux live environment${NC}" >&2
+    exit 1
+fi
+
+# ==========================================
+# 🚀 SPEED & STABILITY OPTIMIZATIONS
+# ==========================================
+echo -e "${GREEN}Optimizing download settings for the Live Environment...${NC}"
+
+# 1. Enable Parallel Downloads IMMEDIATELY in the live environment
+# This makes 'pacstrap' and initial package installs 5x-10x faster
+sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 10/' /etc/pacman.conf
+
+# 2. Disable strict timeout checks on the live ISO to prevent "too slow" errors on single files
+# We modify the XferCommand to be more resilient if possible, or rely on parallel downloads
+# (Standard pacman.conf usually handles this well if ParallelDownloads is on)
+
+# 3. Update Keyring FIRST
+# Stale keys are the #1 cause of "hanging" downloads that look like timeouts
+echo -e "${GREEN}Refreshing Arch Linux Keyring (prevents validation hangs)...${NC}"
+pacman -Sy --noconfirm archlinux-keyring
+
+# ==========================================
+
+# Check if /mnt is already mounted
+if mountpoint -q /mnt; then
+    echo -e "${YELLOW}Warning: /mnt is already mounted. Unmounting...${NC}"
+    umount -R /mnt 2>/dev/null || true
+fi
+
+# Install fzf for better selection interface
+echo -e "${GREEN}Installing fzf for interactive selection...${NC}"
+if ! command -v fzf >/dev/null 2>&1; then
+    pacman -S --noconfirm fzf 2>/dev/null || echo -e "${YELLOW}Warning: Could not install fzf, will use fallback${NC}"
+fi
+
+# Function to select from list using fzf or fallback to dialog
+select_option() {
     local prompt="$1"
-    local response
-    while true; do
-        read -rp "$prompt [y/n]: " response < /dev/tty
-        case "$response" in
-            [Yy]) return 0 ;;
-            [Nn]) return 1 ;;
-            *) echo "Please enter y or n." ;;
-        esac
-    done
-}
-
-### 0. Installing basic tools ###
-echo "Installing basic system tools..."
-sudo pacman -S --noconfirm man unzip tldr flatpak
-
-### 1. Install grub-btrfs with Timeshift support ###
-echo "Installing grub-btrfs..."
-sudo pacman -S --noconfirm timeshift grub-btrfs
-
-echo "Configuring grub-btrfsd to use Timeshift..."
-sudo cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
-sudo sed -i 's|ExecStart=.*|ExecStart=/usr/bin/grub-btrfsd --syslog --timeshift-auto|' /etc/systemd/system/grub-btrfsd.service
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now grub-btrfsd.service
-
-echo "Updating grub..."
-sudo grub-mkconfig -o /boot/grub/grub.cfg
-
-### 2. Install reflector and configure fastest global mirrors (balanced) ###
-echo "Installing reflector..."
-sudo pacman -S --noconfirm reflector curl
-
-REFLECTOR_OVERRIDE_DIR="/etc/systemd/system/reflector.service.d"
-sudo mkdir -p "$REFLECTOR_OVERRIDE_DIR"
-cat <<EOF | sudo tee "$REFLECTOR_OVERRIDE_DIR/override.conf"
-[Service]
-ExecStart=
-ExecStart=/usr/bin/reflector --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist
-EOF
-
-sudo systemctl daemon-reload
-# sudo systemctl enable --now reflector.timer
-# sudo systemctl enable --now reflector.service
-
-### 3. Add Chaotic AUR ###
-echo "Adding Chaotic AUR..."
-sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
-sudo pacman-key --lsign-key 3056513887B78AEB
-sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
-sudo pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
-
-if ! grep -q "\[chaotic-aur\]" /etc/pacman.conf; then
-    cat <<'EOF' | sudo tee -a /etc/pacman.conf
-
-[chaotic-aur]
-Include = /etc/pacman.d/chaotic-mirrorlist
-EOF
-fi
-
-echo "Refreshing system repositories..."
-sudo pacman -Sy
-
-### 4. Install yay-bin (AUR helper) from source ###
-echo "Installing yay-bin..."
-if ! command -v git &> /dev/null; then
-    sudo pacman -S --noconfirm git base-devel
-fi
-
-sudo -u $(logname) bash <<'EOF'
-cd /tmp
-git clone https://aur.archlinux.org/yay-bin.git
-cd yay-bin
-makepkg -si --noconfirm
-EOF
-
-
-### 5. Install JetBrains Mono Nerd Font ###
-echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
+    shift
+    local options=("$@")
+    local result
     
-USER_NAME=$(logname)
-
-sudo -u "$USER_NAME" bash <<'EOF'
-mkdir -p ~/.local/share/fonts/nerd-fonts
-cd /tmp
-curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
-fc-cache -fv
-EOF
-
-echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
-
-### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
-echo "Enabling parallel downloads and parallel compilation..."
-# Uncommenting parallel downloads in /etc/pacman.conf
-sudo sed -i 's/^#\s*\(ParallelDownloads\s*=\s*[0-9]*\)/\1/' /etc/pacman.conf
-# Uncommenting MAKEFLAGS to use number of threads available on device in /etc/makepkg.conf
-threads=$(nproc --all)
-sudo awk -v threads="$threads" '
-/^#\s*MAKEFLAGS=/ { sub(/#.*/, "MAKEFLAGS=\"-j" threads "\""); found=1 }
-/^MAKEFLAGS=/ { sub(/=.*/, "=\"-j" threads "\""); found=1 }
-{ print }
-END {
-    if (!found) print "MAKEFLAGS=\"-j" threads "\""
+    if command -v fzf >/dev/null 2>&1; then
+        result=$(printf '%s\n' "${options[@]}" | fzf --prompt="$prompt: " --height=40% --reverse)
+        echo "$result"
+    elif command -v dialog >/dev/null 2>&1; then
+        local menu_items=()
+        local i=0
+        for opt in "${options[@]}"; do
+            menu_items+=("$i" "$opt")
+            ((i++))
+        done
+        result=$(dialog --stdout --menu "$prompt" 0 0 0 "${menu_items[@]}")
+        if [[ -n "$result" ]]; then
+            echo "${options[$result]}"
+        fi
+    else
+        # Fallback to numbered list
+        echo "$prompt" >&2
+        local i=1
+        for opt in "${options[@]}"; do
+            echo "  $i) $opt" >&2
+            ((i++))
+        done
+        echo -n "Enter choice [1-$((i-1))]: " >&2
+        local choice
+        if [[ -t 0 ]]; then
+            read choice
+        else
+            read choice < /dev/tty
+        fi
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -lt $i ]]; then
+            echo "${options[$((choice-1))]}"
+        fi
+    fi
 }
-' /etc/makepkg.conf > /tmp/makepkg.conf && sudo mv /tmp/makepkg.conf /etc/makepkg.conf 
 
-# Uncommenting IgnorePkg in /etc/pacman.conf to make pin and unpin aliases work properly
-sudo sed -i 's/^#\s*IgnorePkg\s*=/IgnorePkg =/' /etc/pacman.conf
-# If IgnorePkg still doesn't exist at all under [options], add it once
-if ! grep -q "^IgnorePkg\s*=" /etc/pacman.conf; then
-    sudo sed -i '/^\[options\]/a IgnorePkg =' /etc/pacman.conf
-fi
+# Function to get user input
+get_input() {
+    local prompt="$1"
+    local default="${2:-}"
+    local secret="${3:-false}"
+    local result
+    
+    if command -v dialog >/dev/null 2>&1; then
+        if [[ "$secret" == "true" ]]; then
+            result=$(dialog --stdout --insecure --passwordbox "$prompt" 0 0 "$default")
+        else
+            result=$(dialog --stdout --inputbox "$prompt" 0 0 "$default")
+        fi
+        echo "$result"
+    else
+        if [[ "$secret" == "true" ]]; then
+            if [[ -t 0 ]]; then
+                read -sp "$prompt: " input
+            else
+                read -sp "$prompt: " input < /dev/tty
+            fi
+            echo >&2
+            echo "$input"
+        else
+            if [[ -t 0 ]]; then
+                read -p "$prompt: " input
+            else
+                read -p "$prompt: " input < /dev/tty
+            fi
+            echo "${input:-$default}"
+        fi
+    fi
+}
 
+# Function to get yes/no answer
+get_yesno() {
+    local prompt="$1"
+    
+    if command -v dialog >/dev/null 2>&1; then
+        dialog --yesno "$prompt" 0 0 2>&1 >/dev/tty
+        return $?
+    else
+        if [[ -t 0 ]]; then
+            read -p "$prompt (y/n): " answer
+        else
+            read -p "$prompt (y/n): " answer < /dev/tty
+        fi
+        [[ "$answer" =~ ^[Yy]$ ]]
+    fi
+}
 
-### 7. Install Zsh and customizations ###
-echo "Installing zsh, oh-my-zsh, starship..."
-sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
+# Collect user information
+echo -e "${GREEN}=== Arch Linux Installation Script ===${NC}\n"
 
-USER_NAME=$(logname)
-USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
-ZSHRC="$USER_HOME/.zshrc"
-
-# Install Oh-My-Zsh unattended
-sudo -u "$USER_NAME" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-
-# Ensure .config exists
-sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
-
-# Add zsh-syntax-highlighting
-echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
-
-# Add Starship init
-sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
-
-# Aliases
-echo 'alias ll="ls -l"' | sudo tee -a "$ZSHRC"
-echo 'alias la="ls -a"' | sudo tee -a "$ZSHRC"
-echo 'alias l="ls -la"' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-
-echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC"
-echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-
-echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (you can remove the backslashes)' | sudo tee -a "$ZSHRC"
-echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-
-echo '# Disable sleep when AUR package is being built' | sudo tee -a "$ZSHRC"
-echo 'alias yay="systemd-inhibit --what=sleep --who=yay --why=\"AUR build in progress\" yay"' | sudo tee -a "$ZSHRC"  
-
-echo '# Remove selected files' | sudo tee -a "$ZSHRC"
-echo 'removefiles() {
-  local pattern="$1" dir selected
-
-  [[ -z "$pattern" ]] && {
-    echo "Usage: removefiles <pattern>"
-    return 1
-  }
-
-  read "choice?Search (1) Root (2) Custom: "
-  case "$choice" in
-    2)
-      dir=$(find / -maxdepth 3 -type d 2>/dev/null |
-            fzf --height 70% --border)
-      dir="${dir:-/}"
-      ;;
-    *) dir="/" ;;
-  esac
-
-  selected=$(
-    fd -HI --absolute-path -t f -t d "$pattern" "$dir" 2>/dev/null |
-      fzf --multi \
-          --height 70% \
-          --bind "tab:toggle" \
-          --border \
-          --prompt="Select> " \
-          --header="TAB = select/unselect | ENTER = confirm | ESC = cancel"
-  )
-
-  [[ -z "$selected" ]] && {
-    echo "No files selected."
-    return 0
-  }
-
-  echo
-  echo "The following items will be deleted:"
-  echo "------------------------------------"
-  printf '%s\n' "$selected"
-  echo "------------------------------------"
-
-  read "confirm?Proceed with deletion? [y/N]: "
-  [[ "$confirm" != [yY] ]] && {
-    echo "Aborted."
-    return 0
-  }
-
-  printf '%s\n' "$selected" | sudo xargs -r rm -rf
-
-  echo "Bulk deletion complete."
-}' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-
-echo '# Search files with fd' | sudo tee -a "$ZSHRC"
-echo 'search() {
-  local pattern="$1" dir
-  if [[ -z "$pattern" ]]; then
-    echo "Usage: search <pattern>"
-    return 1
-  fi
-  echo "Search from:"
-  echo "1) Root directory (/)"
-  echo "2) Specific directory (choose with fzf)"
-  read "choice?Choice (1/2): "
-  case "$choice" in
-    2)
-      dir=$(find / -type d -maxdepth 3 2>/dev/null | fzf --prompt="Select directory: " --height=50%)
-      dir="${dir:-/}"
-      ;;
-    1|"") dir="/" ;;
-    *) echo "Invalid choice. Using root."; dir="/" ;;
-  esac
-  echo "Searching for \"$pattern\" in $dir..."
-  fd -HI --absolute-path "$pattern" "$dir" 2>/dev/null
-}' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-
-echo '# Pin a package (add to IgnorePkg)' | sudo tee -a "$ZSHRC"
-echo 'pin() {
-    sudo grep -q "^IgnorePkg" /etc/pacman.conf || echo "IgnorePkg =" | sudo tee -a /etc/pacman.conf >/dev/null
-    comm -23 <(pacman -Qq | sort) <(grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sort -u | sed "/^$/d") | \
-    fzf --prompt="Pin: " --height=70% --border | \
-    while read -r pkg; do
-        sudo sed -i "/^IgnorePkg/ s/$/ $pkg/" /etc/pacman.conf
-        sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
-        echo "Pinned: $pkg"
-    done
-}' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
-echo 'unpin() {
-    grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sed "/^$/d" | \
-    fzf --prompt="Unpin: " --height=70% --border --multi | \
-    while read -r pkg; do
-        escaped_pkg=$(printf "%s\n" "$pkg" | sed "s/[.[\*^$]/\\\\&/g")
-        sudo sed -i "/^IgnorePkg/ s/[[:space:]]$escaped_pkg//g" /etc/pacman.conf
-        sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
-        sudo sed -i "/^IgnorePkg[[:space:]]*=/ s/$//" /etc/pacman.conf
-        echo "Unpinned: $pkg"
-    done
-    sudo sed -i "s/^IgnorePkg[[:space:]]*=[[:space:]]*$/IgnorePkg =/" /etc/pacman.conf
-}' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-
-echo 'source ~/.local/bin/theme-env.sh' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-
-# For theme customizations
-echo '#For theming the syntax highlighting' | sudo tee -a "$ZSHRC"
-echo '[ -f ~/.config/zsh_theme_sync ] && source ~/.config/zsh_theme_sync' | sudo tee -a "$ZSHRC"
-
-# Set default shell to zsh
-sudo chsh -s /bin/zsh "$USER_NAME"
-
-# Fix permissions
-sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
-
-# Disabling starship timeout warnings 
-mkdir -p ~/.config/
-
-cat > ~/.config/starship.toml <<'EOF'
-# Disable timeout warnings by setting a very high value (in milliseconds)
-scan_timeout = 10000
-EOF
-
-
-### 8. Kernel headers installation ###
-current_kernel=$(uname -r)
-suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
-
-if [[ "$suffix" == *"arch"* ]]; then
-    sudo pacman -S --noconfirm linux-headers
-elif [[ "$suffix" == *"lts"* ]]; then
-        sudo pacman -S --noconfirm linux-lts-headers
-elif [[ "$suffix" == *"zen"* ]]; then
-    sudo pacman -S --noconfirm linux-zen-headers
-elif [[ "$suffix" == *"hardened"* ]]; then
-    sudo pacman -S --noconfirm linux-hardened-headers
+# Root password
+echo -n "Enter root password (leave empty to lock root account): "
+if [[ -t 0 ]]; then
+    read -s ROOT_PASSWORD
 else
-    echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
-    echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
+    read -s ROOT_PASSWORD < /dev/tty
+fi
+echo ""
+if [[ -z "$ROOT_PASSWORD" ]]; then
+    LOCK_ROOT=true
+    echo -e "${YELLOW}Root account will be locked${NC}"
+else
+    LOCK_ROOT=false
 fi
 
+# Username
+echo -n "Enter username: "
+if [[ -t 0 ]]; then
+    read USERNAME
+else
+    read USERNAME < /dev/tty
+fi
+if [[ -z "$USERNAME" ]]; then
+    echo -e "${RED}Error: Username cannot be empty${NC}" >&2
+    exit 1
+fi
 
-### 9. Virtualization setup ###
-    while true; do
-        read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice < /dev/tty
-        case "$qemu_choice" in
-            full) qemu_pkg="qemu-full"; break ;;
-            desktop) qemu_pkg="qemu-desktop"; break ;;
-            *) echo "Please enter 'full' or 'desktop'." ;;
-        esac
-    done
+# User password
+echo -n "Enter user password: "
+if [[ -t 0 ]]; then
+    read -s USER_PASSWORD
+else
+    read -s USER_PASSWORD < /dev/tty
+fi
+echo ""
+if [[ -z "$USER_PASSWORD" ]]; then
+    echo -e "${RED}Error: User password cannot be empty${NC}" >&2
+    exit 1
+fi
 
-    echo "Installing virtualization packages..."
-    sudo pacman -S --noconfirm libvirt virt-manager "$qemu_pkg" dnsmasq dmidecode
+# Confirm password
+echo -n "Confirm user password: "
+if [[ -t 0 ]]; then
+    read -s CONFIRM_PASSWORD
+else
+    read -s CONFIRM_PASSWORD < /dev/tty
+fi
+echo ""
+if [[ "$USER_PASSWORD" != "$CONFIRM_PASSWORD" ]]; then
+    echo -e "${RED}Error: Passwords do not match${NC}" >&2
+    exit 1
+fi
 
-    echo "Enabling virtualization services..."
-    sudo systemctl enable --now libvirtd.service virtlogd.service
+# Disk selection
+echo -e "\n${GREEN}Detecting disks...${NC}"
+DISKS=($(lsblk -dno NAME | grep -E '^[sv]d[a-z]$|^nvme[0-9]+n[0-9]+$'))
+if [[ ${#DISKS[@]} -eq 0 ]]; then
+    echo -e "${RED}Error: No disks found${NC}" >&2
+    exit 1
+fi
 
-    echo "Adding user to libvirt and kvm groups..."
-    sudo usermod -aG libvirt $(logname)
-    sudo usermod -aG kvm $(logname)
+DISK_OPTIONS=()
+for disk in "${DISKS[@]}"; do
+    SIZE=$(lsblk -bdno SIZE "/dev/$disk")
+    DISK_OPTIONS+=("$disk ($SIZE)")
+done
 
-    echo "Autostarting default libvirt network..."
-    sudo virsh net-autostart default
+SELECTED_DISK_OPTION=$(select_option "Select disk to install Arch Linux" "${DISK_OPTIONS[@]}")
+if [[ -z "$SELECTED_DISK_OPTION" ]]; then
+    echo -e "${RED}Error: Disk selection cancelled${NC}" >&2
+    exit 1
+fi
+SELECTED_DISK=$(echo "$SELECTED_DISK_OPTION" | awk '{print $1}')
+DISK_PATH="/dev/$SELECTED_DISK"
+
+# Partitioning method
+PARTITION_METHOD=$(select_option "Select partitioning method" \
+    "Use entire disk" \
+    "Use remaining free space" \
+    "Manual partitioning (cfdisk)")
+if [[ -z "$PARTITION_METHOD" ]]; then
+    echo -e "${RED}Error: Partitioning method selection cancelled${NC}" >&2
+    exit 1
+fi
+
+# GPU selection
+GPU_CHOICE=$(select_option "Select your GPU" \
+    "Intel" \
+    "AMD" \
+    "NVIDIA (newer)" \
+    "NVIDIA (older)")
+if [[ -z "$GPU_CHOICE" ]]; then
+    echo -e "${RED}Error: GPU selection cancelled${NC}" >&2
+    exit 1
+fi
+
+# Mirror countries
+COUNTRY_OPTIONS=(
+    "US United States"
+    "DE Germany"
+    "GB United Kingdom"
+    "FR France"
+    "NL Netherlands"
+    "SE Sweden"
+    "CA Canada"
+    "AU Australia"
+    "JP Japan"
+    "KR South Korea"
+    "SG Singapore"
+    "IN India"
+    "BR Brazil"
+    "PL Poland"
+    "CZ Czech Republic"
+    "IT Italy"
+    "ES Spain"
+    "CH Switzerland"
+    "AT Austria"
+    "DK Denmark"
+    "NO Norway"
+    "FI Finland"
+    "CN China"
+)
+
+MIRROR_COUNTRIES=""
+if command -v fzf >/dev/null 2>&1; then
+    MIRROR_COUNTRIES=$(printf '%s\n' "${COUNTRY_OPTIONS[@]}" | fzf -m --prompt="Select mirror countries (TAB to multi-select, Esc for global): " --height=50% --reverse --border | awk '{print $1}' | paste -sd',' -)
+else
+    echo -n "Enter comma-separated country codes (e.g. US,DE) or leave empty for global: "
+    if [[ -t 0 ]]; then
+        read MIRROR_COUNTRIES
+    else
+        read MIRROR_COUNTRIES < /dev/tty
+    fi
+    MIRROR_COUNTRIES=${MIRROR_COUNTRIES^^}
+fi
+
+# Printing support
+if get_yesno "Do you want printing support (CUPS)?"; then
+    INSTALL_CUPS=true
+else
+    INSTALL_CUPS=false
+fi
+
+# Confirmation
+echo -e "\n${YELLOW}=== Installation Summary ===${NC}"
+echo "Username: $USERNAME"
+echo "Root account: $([ "$LOCK_ROOT" = true ] && echo "Locked" || echo "Enabled")"
+echo "Disk: $DISK_PATH"
+echo "Partitioning: $PARTITION_METHOD"
+echo "GPU: $GPU_CHOICE"
+echo "Mirror Countries: ${MIRROR_COUNTRIES:-Global Fastest}"
+echo "Printing support: $([ "$INSTALL_CUPS" = true ] && echo "Yes" || echo "No")"
+echo ""
+
+if ! get_yesno "Proceed with installation?"; then
+    echo "Installation cancelled."
+    exit 0
+fi
+
+# Function to partition disk
+partition_disk() {
+    local disk="$1"
+    local method="$2"
     
+    case "$method" in
+        "Use entire disk")
+            echo -e "${GREEN}Partitioning entire disk...${NC}"
+            parted -s "$disk" mklabel gpt
+            parted -s "$disk" mkpart primary fat32 1MiB 513MiB
+            parted -s "$disk" set 1 esp on
+            EFI_PART="${disk}1"
+            # Using entire rest of disk
+            parted -s "$disk" mkpart primary btrfs 513MiB 100%
+            ROOT_PART="${disk}2"
+            ;;
+            
+        "Use remaining free space")
+            echo -e "${GREEN}Detecting free space...${NC}"
+            if ! parted -s "$disk" print &>/dev/null; then
+                echo -e "${RED}Error: Disk has no partition table.${NC}" >&2
+                exit 1
+            fi
+            
+            DISK_SIZE=$(parted -s "$disk" unit MiB print | grep "^Disk" | awk '{print $3}' | sed 's/MiB//')
+            LAST_PART=$(parted -s "$disk" unit MiB print | grep -E '^[[:space:]]*[0-9]+' | tail -1)
+            
+            if [[ -n "$LAST_PART" ]]; then
+                LAST_END=$(echo "$LAST_PART" | awk '{print $3}' | sed 's/MiB//')
+            else
+                LAST_END=1
+            fi
+            
+            START_POS=$((LAST_END + 1))
+            AVAILABLE_SPACE=$((DISK_SIZE - START_POS))
+            
+            if [[ $AVAILABLE_SPACE -lt 2048 ]]; then
+                echo -e "${RED}Error: Not enough free space (need 2GB+).${NC}" >&2
+                exit 1
+            fi
+            
+            # Check for existing EFI
+            if ! parted -s "$disk" print | grep -q "esp on"; then
+                EFI_START=$START_POS
+                EFI_END=$((START_POS + 512))
+                parted -s "$disk" mkpart primary fat32 "${EFI_START}MiB" "${EFI_END}MiB"
+                PART_NUM=$(parted -s "$disk" print | tail -1 | awk '{print $1}')
+                parted -s "$disk" set "$PART_NUM" esp on
+                START_POS=$EFI_END
+            fi
+            
+            parted -s "$disk" mkpart primary btrfs "${START_POS}MiB" 100%
+            ROOT_PART="${disk}$(parted -s "$disk" print | tail -1 | awk '{print $1}')"
+            
+            EFI_PART_NUM=$(parted -s "$disk" print | grep "esp on" | awk '{print $1}')
+            if [[ -n "$EFI_PART_NUM" ]]; then
+                EFI_PART="${disk}${EFI_PART_NUM}"
+            fi
+            ;;
+            
+        "Manual partitioning (cfdisk)")
+            echo -e "${GREEN}Opening cfdisk...${NC}"
+            echo "REQUIRED: 1. EFI (Type: EFI System), 2. Root (Type: Linux filesystem)"
+            read -p "Press Enter to start cfdisk..."
+            cfdisk "$disk"
+            
+            sleep 2
+            partprobe "$disk" 2>/dev/null || true
+            
+            # Smart partition detection
+            EFI_PART=$(lsblk -lnpo NAME,TYPE,PARTTYPE "$disk" | grep -i "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" | awk '{print $1}' | head -1)
+            if [[ -z "$EFI_PART" ]]; then
+                EFI_PART=$(blkid -t TYPE=vfat -o device "$disk"* 2>/dev/null | head -1)
+            fi
+            
+            ROOT_PART=$(lsblk -lnpo NAME,SIZE,TYPE "$disk" | grep part | grep -v "$(basename "$EFI_PART")" | sort -k2 -h | tail -1 | awk '{print $1}')
+            
+            if [[ -z "$ROOT_PART" ]]; then
+                echo -e "${RED}Error: Could not detect root partition.${NC}" >&2
+                exit 1
+            fi
+            ;;
+    esac
+    
+    # NVMe partition naming fix (nvme0n1p1 vs sda1)
+    if [[ "$disk" == *"nvme"* ]] && [[ "$EFI_PART" == "${disk}1" ]]; then
+         EFI_PART="${disk}p1"
+         ROOT_PART="${disk}p2"
+    fi
 
-echo "All tasks completed successfully! Please reboot to apply all changes."
+    # Format
+    if [[ -n "$EFI_PART" ]]; then
+        mkfs.fat -F32 "$EFI_PART" || { echo -e "${RED}Format EFI failed${NC}"; exit 1; }
+    fi
+    mkfs.btrfs -f "$ROOT_PART" || { echo -e "${RED}Format Root failed${NC}"; exit 1; }
+    
+    # Subvolumes
+    mount "$ROOT_PART" /mnt
+    btrfs subvolume create /mnt/@
+    btrfs subvolume create /mnt/@home
+    btrfs subvolume create /mnt/@var
+    btrfs subvolume create /mnt/@snapshots
+    btrfs subvolume create /mnt/@tmp
+    umount /mnt
+    
+    # Mount
+    mount -o subvol=@,compress=zstd:1,noatime "$ROOT_PART" /mnt
+    mkdir -p /mnt/{home,var,tmp,.snapshots,boot/efi}
+    mount -o subvol=@home,compress=zstd:1,noatime "$ROOT_PART" /mnt/home
+    mount -o subvol=@var,compress=zstd:1,noatime "$ROOT_PART" /mnt/var
+    mount -o subvol=@tmp,compress=zstd:1,noatime "$ROOT_PART" /mnt/tmp
+    mount -o subvol=@snapshots,compress=zstd:1,noatime "$ROOT_PART" /mnt/.snapshots
+    
+    if [[ -n "$EFI_PART" ]]; then
+        mount "$EFI_PART" /mnt/boot/efi
+    fi
+}
+
+# Configure mirror using reflector
+echo -e "${GREEN}Configuring fast mirrors (Reflector)...${NC}"
+if ! command -v reflector >/dev/null 2>&1; then
+    pacman -S --noconfirm reflector 2>/dev/null || echo -e "${YELLOW}Warning: Could not install reflector${NC}"
+fi
+
+cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+
+# REFLECTOR OPTIMIZATION: 
+# 1. --download-timeout 5: Skips dead mirrors quickly
+# 2. --latest 20: Ensures freshness
+# 3. --sort rate: Ensures speed
+if command -v reflector >/dev/null 2>&1; then
+    if [[ -n "$MIRROR_COUNTRIES" ]]; then
+        reflector --country "$MIRROR_COUNTRIES" \
+                  --age 12 --protocol https --ipv4 \
+                  --latest 20 --sort rate --save /etc/pacman.d/mirrorlist \
+                  --download-timeout 5 --verbose || {
+            echo -e "${YELLOW}Reflector failed for specific countries, falling back to global...${NC}"
+            reflector --age 12 --protocol https --ipv4 \
+                      --latest 20 --sort rate --save /etc/pacman.d/mirrorlist \
+                      --download-timeout 5
+        }
+    else
+        reflector --age 12 --protocol https --ipv4 \
+                  --latest 20 --sort rate --save /etc/pacman.d/mirrorlist \
+                  --download-timeout 5 --verbose
+    fi
+fi
+
+# Force sync after new mirrorlist
+pacman -Syy
+
+# Partition disk
+partition_disk "$DISK_PATH" "$PARTITION_METHOD"
+
+# Install base system
+# Parallel downloads are now ACTIVE in the live environment, making this part fast
+echo -e "${GREEN}Installing base system (fast mode)...${NC}"
+pacstrap /mnt base base-devel linux linux-firmware btrfs-progs
+
+# Copy the optimized mirrorlist to the new system so it stays fast
+cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
+
+# Configure target pacman.conf
+echo -e "${GREEN}Configuring target system pacman...${NC}"
+if [[ -f /mnt/etc/pacman.conf ]]; then
+    sed -i 's/^#ParallelDownloads.*/ParallelDownloads = 5/' /mnt/etc/pacman.conf
+    sed -i 's/^#Color/Color/' /mnt/etc/pacman.conf
+fi
+
+# Generate fstab
+echo -e "${GREEN}Generating fstab...${NC}"
+genfstab -U /mnt >> /mnt/etc/fstab
+
+# Configure zram swap
+echo -e "${GREEN}Configuring zram swap...${NC}"
+arch-chroot /mnt pacman -S --noconfirm systemd-zram-generator
+cat > /mnt/etc/systemd/zram-generator.conf <<EOF
+[zram0]
+zram-size = ram / 2
+compression-algorithm = zstd
+swap-priority = 100
+EOF
+arch-chroot /mnt systemctl enable systemd-zram-setup@zram0.service
+
+# Install GPU drivers
+echo -e "${GREEN}Installing GPU drivers...${NC}"
+case "$GPU_CHOICE" in
+    "Intel")
+        arch-chroot /mnt pacman -S --noconfirm mesa vulkan-intel intel-media-driver libva-intel-driver intel-gpu-tools ;;
+    "AMD")
+        arch-chroot /mnt pacman -S --noconfirm mesa vulkan-radeon libva-mesa-driver ;;
+    "NVIDIA (newer)")
+        arch-chroot /mnt pacman -S --noconfirm nvidia-open-dkms nvidia-utils lib32-nvidia-utils nvidia-settings ;;
+    "NVIDIA (older)")
+        arch-chroot /mnt pacman -S --noconfirm nvidia nvidia-utils lib32-nvidia-utils nvidia-settings ;;
+esac
+
+# Install NetworkManager
+echo -e "${GREEN}Installing NetworkManager...${NC}"
+arch-chroot /mnt pacman -S --noconfirm networkmanager network-manager-applet nm-connection-editor
+
+if [[ "$INSTALL_CUPS" == "true" ]]; then
+    echo -e "${GREEN}Installing CUPS...${NC}"
+    arch-chroot /mnt pacman -S --noconfirm cups cups-pdf
+    arch-chroot /mnt systemctl enable cups.service
+fi
+
+# Configure system
+echo -e "${GREEN}Configuring system internals...${NC}"
+arch-chroot /mnt ln -sf /usr/share/zoneinfo/UTC /etc/localtime
+arch-chroot /mnt hwclock --systohc
+
+echo "en_US.UTF-8 UTF-8" >> /mnt/etc/locale.gen
+arch-chroot /mnt locale-gen
+echo "LANG=en_US.UTF-8" > /mnt/etc/locale.conf
+echo "archlinux" > /mnt/etc/hostname
+
+cat > /mnt/etc/hosts <<EOF
+127.0.0.1    localhost
+::1          localhost
+127.0.1.1    archlinux.localdomain    archlinux
+EOF
+
+# Create user
+echo -e "${GREEN}Creating user accounts...${NC}"
+arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$USERNAME"
+echo "$USERNAME:$USER_PASSWORD" | arch-chroot /mnt chpasswd
+echo "%wheel ALL=(ALL:ALL) ALL" >> /mnt/etc/sudoers
+
+if [[ "$LOCK_ROOT" == "true" ]]; then
+    arch-chroot /mnt passwd -l root
+else
+    echo "root:$ROOT_PASSWORD" | arch-chroot /mnt chpasswd
+fi
+
+arch-chroot /mnt systemctl enable NetworkManager.service
+
+# Install bootloader
+echo -e "${GREEN}Installing bootloader...${NC}"
+arch-chroot /mnt pacman -S --noconfirm grub efibootmgr
+if [[ -n "$EFI_PART" ]] && [[ -e "$EFI_PART" ]]; then
+    arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB
+else
+    echo -e "${YELLOW}Warning: BIOS/Legacy boot detected.${NC}"
+    arch-chroot /mnt grub-install --target=i386-pc "$DISK_PATH"
+fi
+arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg
+
+# Mkinitcpio
+sed -i 's/^HOOKS=.*/HOOKS=(base udev autodetect modconf kms keyboard keymap consolefont block filesystems btrfs fsck)/' /mnt/etc/mkinitcpio.conf
+arch-chroot /mnt mkinitcpio -P
+
+echo -e "\n${GREEN}=== Installation Complete! ===${NC}"
+echo "You can now reboot into your new Arch Linux installation."
+echo "1. Unmount: umount -R /mnt"
+echo "2. Reboot: reboot"
