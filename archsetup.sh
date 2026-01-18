@@ -152,7 +152,7 @@ echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); };
 echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
-echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States' | sudo tee -a "$ZSHRC"
+echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (if you use just 1 country, no need for quotation marks and backslashes)' | sudo tee -a "$ZSHRC"
 echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
 echo '' | sudo tee -a "$ZSHRC"
 
