@@ -303,17 +303,8 @@ fi
 
 
 ### 9. Virtualization setup ###
-    while true; do
-        read -rp "Do you want 'qemu-full' or 'qemu-desktop'? [full/desktop]: " qemu_choice < /dev/tty
-        case "$qemu_choice" in
-            full) qemu_pkg="qemu-full"; break ;;
-            desktop) qemu_pkg="qemu-desktop"; break ;;
-            *) echo "Please enter 'full' or 'desktop'." ;;
-        esac
-    done
-
     echo "Installing virtualization packages..."
-    sudo pacman -S --noconfirm libvirt virt-manager "$qemu_pkg" dnsmasq dmidecode
+    sudo pacman -S --noconfirm libvirt virt-manager qemu-desktop dnsmasq dmidecode
 
     echo "Enabling virtualization services..."
     sudo systemctl enable --now libvirtd.service virtlogd.service
