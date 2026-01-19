@@ -1,6 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 
+# Check if the script is running as root (required to modify sudoers)
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run with sudo or as root."
+   exit 1
+fi
+
+# Identify the actual user who called the script
+REAL_USER=$(logname)
+SUDOERS_FILE="/etc/sudoers.d/post-install-automation"
+
+# Grant temporary NOPASSWD privilege for the entire session
+echo "Granting temporary passwordless sudo to $REAL_USER..."
+echo "$REAL_USER ALL=(ALL) NOPASSWD: ALL" > "$SUDOERS_FILE"
+
+# Set a trap to delete the file on exit (success or failure)
+trap "rm -f $SUDOERS_FILE; echo 'Temporary sudo privileges removed.'" EXIT
+
 echo "Updating system..."
 sudo pacman -Syu --noconfirm
 
