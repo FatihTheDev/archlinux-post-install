@@ -92,7 +92,7 @@ if ! command -v git &> /dev/null; then
     sudo pacman -S --noconfirm git base-devel
 fi
 
-sudo -u $(logname) bash <<'EOF'
+sudo -u "$USER" bash <<'EOF'
 cd /tmp
 git clone https://aur.archlinux.org/yay-bin.git
 cd yay-bin
@@ -103,7 +103,7 @@ EOF
 ### 5. Install JetBrains Mono Nerd Font ###
 echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     
-USER_NAME=$(logname)
+USER_NAME=$USER
 
 sudo -u "$USER_NAME" bash <<'EOF'
 mkdir -p ~/.local/share/fonts/nerd-fonts
@@ -142,7 +142,7 @@ fi
 echo "Installing zsh, oh-my-zsh, starship..."
 sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
-USER_NAME=$(logname)
+USER_NAME=$USER
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 ZSHRC="$USER_HOME/.zshrc"
 
@@ -326,8 +326,8 @@ fi
     sudo systemctl enable --now libvirtd.service virtlogd.service
 
     echo "Adding user to libvirt and kvm groups..."
-    sudo usermod -aG libvirt $(logname)
-    sudo usermod -aG kvm $(logname)
+    sudo usermod -aG libvirt $USER
+    sudo usermod -aG kvm $USER
 
     echo "Autostarting default libvirt network..."
     sudo virsh net-autostart default
