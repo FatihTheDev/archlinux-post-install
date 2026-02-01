@@ -86,18 +86,9 @@ fi
 echo "Refreshing system repositories..."
 sudo pacman -Sy
 
-### 4. Install yay-bin (AUR helper) from source ###
-echo "Installing yay-bin..."
-if ! command -v git &> /dev/null; then
-    sudo pacman -S --noconfirm git base-devel
-fi
-
-sudo -u "$REAL_USER" bash <<'EOF'
-cd /tmp
-git clone https://aur.archlinux.org/yay-bin.git
-cd yay-bin
-makepkg -si --noconfirm
-EOF
+### 4. Install yay-bin (AUR helper) ###
+echo "Installing yay..."
+sudo pacman -S yay
 
 
 ### 5. Install JetBrains Mono Nerd Font ###
