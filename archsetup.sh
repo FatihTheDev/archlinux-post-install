@@ -4,6 +4,14 @@ set -euo pipefail
 # Identify the actual user who called the script
 # Use $USER if logname fails (e.g., in chroot environment)
 REAL_USER=$(logname 2>/dev/null || echo "$USER")
+# When run from installation.sh (inside arch-chroot), we're root and logname fails:
+# use the first normal user (UID >= 1000) created by the installer
+if [[ "$REAL_USER" == "root" ]]; then
+    FIRST_NORMAL_USER=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1; exit}')
+    if [[ -n "$FIRST_NORMAL_USER" ]]; then
+        REAL_USER="$FIRST_NORMAL_USER"
+    fi
+fi
 SUDOERS_FILE="/etc/sudoers.d/post-install-automation"
 
 # Grant temporary NOPASSWD privilege for the entire session (if not already granted)
@@ -95,16 +103,24 @@ sudo pacman -S yay
 echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     
 USER_NAME=$REAL_USER
+USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 
-sudo -u "$USER_NAME" bash <<'EOF'
-mkdir -p ~/.local/share/fonts/nerd-fonts
-cd /tmp
-curl -LO https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-unzip -j -o JetBrainsMono.zip "JetBrainsMonoNerdFont-Regular.ttf" -d ~/.local/share/fonts/nerd-fonts/
-fc-cache -fv
-EOF
-
-echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
+if [[ -z "$USER_HOME" ]]; then
+    echo "Skipping JetBrains Mono Nerd Font: no home directory for $USER_NAME"
+else
+    if sudo -u "$USER_NAME" bash -c "
+        set -e
+        mkdir -p ~/.local/share/fonts/nerd-fonts
+        cd /tmp
+        curl -fsSL -o JetBrainsMono.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
+        unzip -j -o JetBrainsMono.zip 'JetBrainsMonoNerdFont-Regular.ttf' -d ~/.local/share/fonts/nerd-fonts/
+        fc-cache -fv
+    "; then
+        echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
+    else
+        echo "Warning: JetBrains Mono Nerd Font install failed (e.g. no network in chroot). Run archsetup again after reboot to install."
+    fi
+fi
 
 ### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
 echo "Enabling parallel downloads and parallel compilation..."
