@@ -96,31 +96,12 @@ sudo pacman -Sy
 
 ### 4. Install yay-bin (AUR helper) ###
 echo "Installing yay..."
-sudo pacman -S yay
+sudo pacman -S --noconfirm yay
 
 
 ### 5. Install JetBrains Mono Nerd Font ###
 echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
-    
-USER_NAME=$REAL_USER
-USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
-
-if [[ -z "$USER_HOME" ]]; then
-    echo "Skipping JetBrains Mono Nerd Font: no home directory for $USER_NAME"
-else
-    if sudo -u "$USER_NAME" bash -c "
-        set -e
-        mkdir -p ~/.local/share/fonts/nerd-fonts
-        cd /tmp
-        curl -fsSL -o JetBrainsMono.zip https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip
-        unzip -j -o JetBrainsMono.zip 'JetBrainsMonoNerdFont-Regular.ttf' -d ~/.local/share/fonts/nerd-fonts/
-        fc-cache -fv
-    "; then
-        echo "JetBrains Mono Nerd Font (Regular) installed successfully!"
-    else
-        echo "Warning: JetBrains Mono Nerd Font install failed (e.g. no network in chroot). Run archsetup again after reboot to install."
-    fi
-fi
+sudo pacman -S ttf-jetbrains-mono-nerd
 
 ### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
 echo "Enabling parallel downloads and parallel compilation..."
