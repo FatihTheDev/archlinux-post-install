@@ -134,36 +134,37 @@ USER_NAME=$REAL_USER
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 ZSHRC="$USER_HOME/.zshrc"
 
-# Install Oh-My-Zsh unattended
-sudo -u "$USER_NAME" sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+# Install Oh-My-Zsh unattended (runuser works in chroot where sudo -u can fail)
+runuser -u "$USER_NAME" -- sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 
 # Ensure .config exists
-sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
+mkdir -p "$USER_HOME/.config"
+chown -R "$USER_NAME":"$(id -gn "$USER_NAME")" "$USER_HOME/.config"
 
 # Add zsh-syntax-highlighting
-echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | sudo tee -a "$ZSHRC"
+echo "source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" | tee -a "$ZSHRC"
 
 # Add Starship init
-sudo -u "$USER_NAME" sh -c "echo 'eval \"\$(starship init zsh)\"' >> \"$ZSHRC\""
+echo 'eval "$(starship init zsh)"' >> "$ZSHRC"
 
 # Aliases
-echo 'alias ll="ls -l"' | sudo tee -a "$ZSHRC"
-echo 'alias la="ls -a"' | sudo tee -a "$ZSHRC"
-echo 'alias l="ls -la"' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
+echo 'alias ll="ls -l"' | tee -a "$ZSHRC"
+echo 'alias la="ls -a"' | tee -a "$ZSHRC"
+echo 'alias l="ls -la"' | tee -a "$ZSHRC"
+echo '' | tee -a "$ZSHRC"
 
-echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | sudo tee -a "$ZSHRC"
-echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
+echo "alias removeall='f() { sudo pacman -Rcns \$(pacman -Qq | grep \"\$1\"); }; f'" | tee -a "$ZSHRC"
+echo "alias update-grub='sudo grub-mkconfig -o /boot/grub/grub.cfg'" | tee -a "$ZSHRC"
+echo '' | tee -a "$ZSHRC"
 
-echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (if you use just 1 country, no need for quotation marks and backslashes)' | sudo tee -a "$ZSHRC"
-echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
+echo '# Mirror countries: SE - Sweden, FR - France, DE - Germany, US - United States (if you use just 1 country, no need for quotation marks and backslashes)' | tee -a "$ZSHRC"
+echo 'alias update-mirrors="sudo reflector --country \"SE, FR\" --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist"' | tee -a "$ZSHRC"
+echo '' | tee -a "$ZSHRC"
 
-echo '# Disable sleep when AUR package is being built' | sudo tee -a "$ZSHRC"
-echo 'alias yay="systemd-inhibit --what=sleep --who=yay --why=\"AUR build in progress\" yay"' | sudo tee -a "$ZSHRC"  
+echo '# Disable sleep when AUR package is being built' | tee -a "$ZSHRC"
+echo 'alias yay="systemd-inhibit --what=sleep --who=yay --why=\"AUR build in progress\" yay"' | tee -a "$ZSHRC"  
 
-echo '# Remove selected files' | sudo tee -a "$ZSHRC"
+echo '# Remove selected files' | tee -a "$ZSHRC"
 echo 'removefiles() {
   local pattern="$1" dir selected
 
@@ -212,10 +213,10 @@ echo 'removefiles() {
   printf '%s\n' "$selected" | sudo xargs -r rm -rf
 
   echo "Bulk deletion complete."
-}' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
+}' | tee -a "$ZSHRC"
+echo '' | tee -a "$ZSHRC"
 
-echo '# Search files with fd' | sudo tee -a "$ZSHRC"
+echo '# Search files with fd' | tee -a "$ZSHRC"
 echo 'search() {
   local pattern="$1" dir
   if [[ -z "$pattern" ]]; then
@@ -236,10 +237,10 @@ echo 'search() {
   esac
   echo "Searching for \"$pattern\" in $dir..."
   fd -HI --absolute-path "$pattern" "$dir" 2>/dev/null
-}' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
+}' | tee -a "$ZSHRC"
+echo '' | tee -a "$ZSHRC"
 
-echo '# Pin a package (add to IgnorePkg)' | sudo tee -a "$ZSHRC"
+echo '# Pin a package (add to IgnorePkg)' | tee -a "$ZSHRC"
 echo 'pin() {
     sudo grep -q "^IgnorePkg" /etc/pacman.conf || echo "IgnorePkg =" | sudo tee -a /etc/pacman.conf >/dev/null
     comm -23 <(pacman -Qq | sort) <(grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sort -u | sed "/^$/d") | \
@@ -249,9 +250,9 @@ echo 'pin() {
         sudo sed -i "/^IgnorePkg/ s/[[:space:]]\+/ /g" /etc/pacman.conf
         echo "Pinned: $pkg"
     done
-}' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
-echo '# Unpin a package (remove from IgnorePkg)' | sudo tee -a "$ZSHRC"
+}' | tee -a "$ZSHRC"
+echo '' | tee -a "$ZSHRC"
+echo '# Unpin a package (remove from IgnorePkg)' | tee -a "$ZSHRC"
 echo 'unpin() {
     grep "^IgnorePkg" /etc/pacman.conf | cut -d= -f2 | tr " " "\n" | sed "/^$/d" | \
     fzf --prompt="Unpin: " --height=70% --border --multi | \
@@ -263,28 +264,29 @@ echo 'unpin() {
         echo "Unpinned: $pkg"
     done
     sudo sed -i "s/^IgnorePkg[[:space:]]*=[[:space:]]*$/IgnorePkg =/" /etc/pacman.conf
-}' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
+}' | tee -a "$ZSHRC"
+echo '' | tee -a "$ZSHRC"
 
-echo 'source ~/.local/bin/theme-env.sh' | sudo tee -a "$ZSHRC"
-echo '' | sudo tee -a "$ZSHRC"
+echo 'source ~/.local/bin/theme-env.sh' | tee -a "$ZSHRC"
+echo '' | tee -a "$ZSHRC"
 
 # For theme customizations
-echo '#For theming the syntax highlighting' | sudo tee -a "$ZSHRC"
-echo '[ -f ~/.config/zsh_theme_sync ] && source ~/.config/zsh_theme_sync' | sudo tee -a "$ZSHRC"
+echo '#For theming the syntax highlighting' | tee -a "$ZSHRC"
+echo '[ -f ~/.config/zsh_theme_sync ] && source ~/.config/zsh_theme_sync' | tee -a "$ZSHRC"
 
 # Set default shell to zsh
-sudo chsh -s /bin/zsh "$USER_NAME"
+chsh -s /bin/zsh "$USER_NAME"
 
-# Fix permissions
-sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
+# Fix permissions (run as root, no sudo -u)
+chown -R "$USER_NAME":"$(id -gn "$USER_NAME")" "$USER_HOME/.zshrc" "$USER_HOME/.oh-my-zsh" "$USER_HOME/.config" 2>/dev/null || true
 
-# Disabling starship timeout warnings (for actual user, not root)
-sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
-cat <<'EOF' | sudo -u "$USER_NAME" tee "$USER_HOME/.config/starship.toml" > /dev/null
+# Disabling starship timeout warnings
+mkdir -p "$USER_HOME/.config"
+cat <<'EOF' > "$USER_HOME/.config/starship.toml"
 # Disable timeout warnings by setting a very high value (in milliseconds)
 scan_timeout = 10000
 EOF
+chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$USER_HOME/.config/starship.toml"
 
 
 ### 8. Kernel headers installation ###
