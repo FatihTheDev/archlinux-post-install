@@ -92,7 +92,7 @@ if ! command -v git &> /dev/null; then
     sudo pacman -S --noconfirm git base-devel
 fi
 
-sudo -u "$USER" bash <<'EOF'
+sudo -u "$REAL_USER" bash <<'EOF'
 cd /tmp
 git clone https://aur.archlinux.org/yay-bin.git
 cd yay-bin
@@ -103,7 +103,7 @@ EOF
 ### 5. Install JetBrains Mono Nerd Font ###
 echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
     
-USER_NAME=$USER
+USER_NAME=$REAL_USER
 
 sudo -u "$USER_NAME" bash <<'EOF'
 mkdir -p ~/.local/share/fonts/nerd-fonts
@@ -142,7 +142,7 @@ fi
 echo "Installing zsh, oh-my-zsh, starship..."
 sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
 
-USER_NAME=$USER
+USER_NAME=$REAL_USER
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 ZSHRC="$USER_HOME/.zshrc"
 
@@ -291,10 +291,9 @@ sudo chsh -s /bin/zsh "$USER_NAME"
 # Fix permissions
 sudo chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$ZSHRC"
 
-# Disabling starship timeout warnings 
-mkdir -p ~/.config/
-
-cat > ~/.config/starship.toml <<'EOF'
+# Disabling starship timeout warnings (for actual user, not root)
+sudo -u "$USER_NAME" mkdir -p "$USER_HOME/.config"
+cat <<'EOF' | sudo -u "$USER_NAME" tee "$USER_HOME/.config/starship.toml" > /dev/null
 # Disable timeout warnings by setting a very high value (in milliseconds)
 scan_timeout = 10000
 EOF
@@ -326,8 +325,8 @@ fi
     sudo systemctl enable --now libvirtd.service virtlogd.service
 
     echo "Adding user to libvirt and kvm groups..."
-    sudo usermod -aG libvirt $USER
-    sudo usermod -aG kvm $USER
+    sudo usermod -aG libvirt "$REAL_USER"
+    sudo usermod -aG kvm "$REAL_USER"
 
     echo "Autostarting default libvirt network..."
     sudo virsh net-autostart default
