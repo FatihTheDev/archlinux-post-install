@@ -319,7 +319,7 @@ fi
     sudo usermod -aG kvm "$REAL_USER"
 
     echo "Autostarting default libvirt network..."
-    sudo virsh net-autostart default
+    # sudo virsh net-autostart default
     
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
