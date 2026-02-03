@@ -318,7 +318,7 @@ fi
     sudo usermod -aG libvirt "$REAL_USER"
     sudo usermod -aG kvm "$REAL_USER"
 
-    echo "Autostarting default libvirt network..."
+    # echo "Autostarting default libvirt network..."
     # sudo virsh net-autostart default
     
 
