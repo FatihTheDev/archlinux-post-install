@@ -2,14 +2,15 @@
 set -euo pipefail
 
 # Identify the actual user who called the script
-# When run from installation.sh (inside arch-chroot as root), use INSTALL_USER or first normal user
-if [[ -n "${INSTALL_USER:-}" ]]; then
-    REAL_USER="$INSTALL_USER"
-elif [[ "$(whoami)" == "root" ]]; then
+# Use $USER if logname fails (e.g., in chroot environment)
+REAL_USER=$(logname 2>/dev/null || echo "$USER")
+# When run from installation.sh (inside arch-chroot), we're root and logname fails:
+# use the first normal user (UID >= 1000) created by the installer
+if [[ "$REAL_USER" == "root" ]]; then
     FIRST_NORMAL_USER=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1; exit}')
-    REAL_USER="${FIRST_NORMAL_USER:-$(logname 2>/dev/null || echo "$USER")}"
-else
-    REAL_USER=$(logname 2>/dev/null || echo "$USER")
+    if [[ -n "$FIRST_NORMAL_USER" ]]; then
+        REAL_USER="$FIRST_NORMAL_USER"
+    fi
 fi
 SUDOERS_FILE="/etc/sudoers.d/post-install-automation"
 
@@ -133,8 +134,8 @@ USER_NAME=$REAL_USER
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 ZSHRC="$USER_HOME/.zshrc"
 
-# Install Oh-My-Zsh
-sudo pacman -S --noconfirm oh-my-zsh-git
+# Install Oh-My-Zsh unattended (runuser works in chroot where sudo -u can fail)
+runuser -u "$USER_NAME" -- sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 
 # Ensure .config exists
 mkdir -p "$USER_HOME/.config"
@@ -318,7 +319,7 @@ fi
     sudo usermod -aG kvm "$REAL_USER"
 
     # echo "Autostarting default libvirt network..."
-    # sudo virsh net-autostat default
+    # sudo virsh net-autostart default
     
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
