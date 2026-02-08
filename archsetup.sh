@@ -2,15 +2,14 @@
 set -euo pipefail
 
 # Identify the actual user who called the script
-# Use $USER if logname fails (e.g., in chroot environment)
-REAL_USER=$(logname 2>/dev/null || echo "$USER")
-# When run from installation.sh (inside arch-chroot), we're root and logname fails:
-# use the first normal user (UID >= 1000) created by the installer
-if [[ "$REAL_USER" == "root" ]]; then
+# When run from installation.sh (inside arch-chroot as root), use INSTALL_USER or first normal user
+if [[ -n "${INSTALL_USER:-}" ]]; then
+    REAL_USER="$INSTALL_USER"
+elif [[ "$(whoami)" == "root" ]]; then
     FIRST_NORMAL_USER=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 {print $1; exit}')
-    if [[ -n "$FIRST_NORMAL_USER" ]]; then
-        REAL_USER="$FIRST_NORMAL_USER"
-    fi
+    REAL_USER="${FIRST_NORMAL_USER:-$(logname 2>/dev/null || echo "$USER")}"
+else
+    REAL_USER=$(logname 2>/dev/null || echo "$USER")
 fi
 SUDOERS_FILE="/etc/sudoers.d/post-install-automation"
 
@@ -135,7 +134,9 @@ USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 ZSHRC="$USER_HOME/.zshrc"
 
 # Install Oh-My-Zsh unattended (runuser works in chroot where sudo -u can fail)
-runuser -u "$USER_NAME" -- sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -o /tmp/omz-install.sh
+runuser -u "$USER_NAME" -- sh /tmp/omz-install.sh --unattended
+rm -f /tmp/omz-install.sh
 
 # Ensure .config exists
 mkdir -p "$USER_HOME/.config"
