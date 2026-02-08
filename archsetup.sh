@@ -108,13 +108,14 @@ echo "Enabling parallel downloads and parallel compilation..."
 sudo sed -i 's/^#\s*\(ParallelDownloads\s*=\s*[0-9]*\)/\1/' /etc/pacman.conf
 # Uncommenting MAKEFLAGS to use number of threads available on device in /etc/makepkg.conf
 threads=$(nproc --all)
-if grep -q '^#\s*MAKEFLAGS=' /etc/makepkg.conf; then
-    sudo sed -i "s/^#\s*MAKEFLAGS=.*/MAKEFLAGS=\"-j$threads\"/" /etc/makepkg.conf
-elif grep -q '^MAKEFLAGS=' /etc/makepkg.conf; then
-    sudo sed -i "s/^MAKEFLAGS=.*/MAKEFLAGS=\"-j$threads\"/" /etc/makepkg.conf
-else
-    echo "MAKEFLAGS=\"-j$threads\"" | sudo tee -a /etc/makepkg.conf
-fi 
+sudo awk -v threads="$threads" '
+/^#\s*MAKEFLAGS=/ { sub(/#.*/, "MAKEFLAGS=\"-j" threads "\""); found=1 }
+/^MAKEFLAGS=/ { sub(/=.*/, "=\"-j" threads "\""); found=1 }
+{ print }
+END {
+    if (!found) print "MAKEFLAGS=\"-j" threads "\""
+}
+' /etc/makepkg.conf > /tmp/makepkg.conf && sudo mv /tmp/makepkg.conf /etc/makepkg.conf 
 
 # Uncommenting IgnorePkg in /etc/pacman.conf to make pin and unpin aliases work properly
 sudo sed -i 's/^#\s*IgnorePkg\s*=/IgnorePkg =/' /etc/pacman.conf
@@ -132,10 +133,8 @@ USER_NAME=$REAL_USER
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
 ZSHRC="$USER_HOME/.zshrc"
 
-# Install Oh-My-Zsh unattended (runuser works in chroot where sudo -u can fail)
-curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -o /tmp/omz-install.sh
-runuser -u "$USER_NAME" -- sh /tmp/omz-install.sh --unattended
-rm -f /tmp/omz-install.sh
+# Install Oh-My-Zsh
+sudo pacman -S --noconfirm oh-my-zsh-git
 
 # Ensure .config exists
 mkdir -p "$USER_HOME/.config"
@@ -319,7 +318,7 @@ fi
     sudo usermod -aG kvm "$REAL_USER"
 
     # echo "Autostarting default libvirt network..."
-    # sudo virsh net-autostart default
+    # sudo virsh net-autostat default
     
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
