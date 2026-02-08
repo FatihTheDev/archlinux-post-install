@@ -101,26 +101,20 @@ sudo pacman -S --noconfirm yay
 
 ### 5. Install JetBrains Mono Nerd Font ###
 echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
-sudo pacman -S ttf-jetbrains-mono-nerd
+sudo pacman -S --noconfirm ttf-jetbrains-mono-nerd
 
 ### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
 echo "Enabling parallel downloads and parallel compilation..."
 # Uncommenting parallel downloads in /etc/pacman.conf
 sudo sed -i 's/^#\s*\(ParallelDownloads\s*=\s*[0-9]*\)/\1/' /etc/pacman.conf
 # Uncommenting MAKEFLAGS to use number of threads available on device in /etc/makepkg.conf
-threads=$(nproc --all)
-sudo awk -v threads="$threads" '
-/^#\s*MAKEFLAGS=/ { sub(/#.*/, "MAKEFLAGS=\"-j" threads "\""); found=1 }
-/^MAKEFLAGS=/ { sub(/=.*/, "=\"-j" threads "\""); found=1 }
-{ print }
-END {
-    if (!found) print "MAKEFLAGS=\"-j" threads "\""
-}
-' /etc/makepkg.conf > /tmp/makepkg.conf && sudo mv /tmp/makepkg.conf /etc/makepkg.conf 
+cores=$(nproc)
+sudo sed -i "s/^#\?MAKEFLAGS=.*/MAKEFLAGS=\"-j$cores\"/" /etc/makepkg.conf
 
-# Uncommenting IgnorePkg in /etc/pacman.conf to make pin and unpin aliases work properly
+# Uncomment IgnorePkg to make pin/unpin aliases work
 sudo sed -i 's/^#\s*IgnorePkg\s*=/IgnorePkg =/' /etc/pacman.conf
-# If IgnorePkg still doesn't exist at all under [options], add it once
+
+# If IgnorePkg doesn't exist, add it
 if ! grep -q "^IgnorePkg\s*=" /etc/pacman.conf; then
     sudo sed -i '/^\[options\]/a IgnorePkg =' /etc/pacman.conf
 fi
