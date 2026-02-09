@@ -64,18 +64,6 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 echo "Installing reflector..."
 sudo pacman -S --noconfirm reflector curl
 
-REFLECTOR_OVERRIDE_DIR="/etc/systemd/system/reflector.service.d"
-sudo mkdir -p "$REFLECTOR_OVERRIDE_DIR"
-cat <<EOF | sudo tee "$REFLECTOR_OVERRIDE_DIR/override.conf"
-[Service]
-ExecStart=
-ExecStart=/usr/bin/reflector --latest 7 --sort rate --fastest 5 --protocol https --save /etc/pacman.d/mirrorlist
-EOF
-
-sudo systemctl daemon-reload
-# sudo systemctl enable --now reflector.timer
-# sudo systemctl enable --now reflector.service
-
 ### 3. Add Chaotic AUR ###
 echo "Adding Chaotic AUR..."
 sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
@@ -98,7 +86,6 @@ sudo pacman -Sy
 echo "Installing yay..."
 sudo pacman -S --noconfirm yay
 
-
 ### 5. Install JetBrains Mono Nerd Font ###
 echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
 sudo pacman -S --noconfirm ttf-jetbrains-mono-nerd
@@ -108,8 +95,8 @@ echo "Enabling parallel downloads and parallel compilation..."
 # Uncommenting parallel downloads in /etc/pacman.conf
 sudo sed -i 's/^#\s*\(ParallelDownloads\s*=\s*[0-9]*\)/\1/' /etc/pacman.conf
 # Uncommenting MAKEFLAGS to use number of threads available on device in /etc/makepkg.conf
-cores=$(nproc)
-sudo sed -i "s/^#\?MAKEFLAGS=.*/MAKEFLAGS=\"-j$cores\"/" /etc/makepkg.conf
+threads=$(nproc)
+sudo sed -i "s/^#\?MAKEFLAGS=.*/MAKEFLAGS=\"-j$threads\"/" /etc/makepkg.conf
 
 # Uncomment IgnorePkg to make pin/unpin aliases work
 sudo sed -i 's/^#\s*IgnorePkg\s*=/IgnorePkg =/' /etc/pacman.conf
@@ -283,25 +270,7 @@ EOF
 chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$USER_HOME/.config/starship.toml"
 
 
-### 8. Kernel headers installation ###
-current_kernel=$(uname -r)
-suffix=$(echo "$current_kernel" | cut -d'-' -f2-)
-
-if [[ "$suffix" == *"arch"* ]]; then
-    sudo pacman -S --noconfirm linux-headers
-elif [[ "$suffix" == *"lts"* ]]; then
-        sudo pacman -S --noconfirm linux-lts-headers
-elif [[ "$suffix" == *"zen"* ]]; then
-    sudo pacman -S --noconfirm linux-zen-headers
-elif [[ "$suffix" == *"hardened"* ]]; then
-    sudo pacman -S --noconfirm linux-hardened-headers
-else
-    echo "⚠ Could not automatically determine headers for kernel: $current_kernel"
-    echo "You may need to install them manually (e.g. linux-headers, linux-lts-headers)."
-fi
-
-
-### 9. Virtualization setup ###
+### 8. Virtualization setup ###
     echo "Installing virtualization packages..."
     sudo pacman -S --noconfirm libvirt virt-manager qemu-desktop dnsmasq dmidecode
 
@@ -317,3 +286,4 @@ fi
     
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
+
