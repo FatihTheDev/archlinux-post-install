@@ -281,8 +281,8 @@ chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$USER_HOME/.config/starship.toml"
     sudo usermod -aG libvirt "$REAL_USER"
     sudo usermod -aG kvm "$REAL_USER"
 
-    # echo "Autostarting default libvirt network..."
-    # sudo virsh net-autostart default
+    echo "Autostarting default libvirt network..."
+    sudo virsh net-autostart default
     
 
 echo "All tasks completed successfully! Please reboot to apply all changes."
