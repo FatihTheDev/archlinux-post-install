@@ -25,6 +25,11 @@ fi
 # Set a trap to delete the file on exit (success or failure)
 trap "sudo rm -f $SUDOERS_FILE; echo 'Temporary sudo privileges removed.'" EXIT
 
+PACMAN_EXTRA_ARGS=()
+if [[ -n "${INSTALL_USER:-}" ]]; then
+    PACMAN_EXTRA_ARGS+=(--disable-download-timeout)
+fi
+
 echo "Updating system..."
 sudo pacman -Syu --noconfirm
 
@@ -44,11 +49,11 @@ ask_yn() {
 
 ### 0. Installing basic tools ###
 echo "Installing basic system tools..."
-sudo pacman -S --noconfirm man unzip tldr flatpak
+sudo pacman "${PACMAN_EXTRA_ARGS[@]}" -S --noconfirm man unzip tldr flatpak
 
 ### 1. Install grub-btrfs with Timeshift support ###
 echo "Installing grub-btrfs..."
-sudo pacman -S --noconfirm timeshift grub-btrfs
+sudo pacman "${PACMAN_EXTRA_ARGS[@]}" -S --noconfirm timeshift grub-btrfs
 
 echo "Configuring grub-btrfsd to use Timeshift..."
 sudo cp /usr/lib/systemd/system/grub-btrfsd.service /etc/systemd/system/grub-btrfsd.service
@@ -62,7 +67,7 @@ sudo grub-mkconfig -o /boot/grub/grub.cfg
 
 ### 2. Install reflector and configure fastest global mirrors (balanced) ###
 echo "Installing reflector..."
-sudo pacman -S --noconfirm reflector curl
+sudo pacman "${PACMAN_EXTRA_ARGS[@]}" -S --noconfirm reflector curl
 
 ### 3. Add Chaotic AUR ###
 echo "Adding Chaotic AUR..."
@@ -84,11 +89,11 @@ sudo pacman -Sy
 
 ### 4. Install yay-bin (AUR helper) ###
 echo "Installing yay..."
-sudo pacman -S --noconfirm yay
+sudo pacman "${PACMAN_EXTRA_ARGS[@]}" -S --noconfirm yay
 
 ### 5. Install JetBrains Mono Nerd Font ###
 echo "Downloading and installing JetBrains Mono Nerd Font (Regular)..."
-sudo pacman -S --noconfirm ttf-jetbrains-mono-nerd
+sudo pacman "${PACMAN_EXTRA_ARGS[@]}" -S --noconfirm ttf-jetbrains-mono-nerd
 
 ### 6. Modify /etc/pacman.conf and /etc/makepkg.conf to enable parallel downloads and parallel compilation ###
 echo "Enabling parallel downloads and parallel compilation..."
@@ -109,7 +114,7 @@ fi
 
 ### 7. Install Zsh and customizations ###
 echo "Installing zsh, oh-my-zsh, starship..."
-sudo pacman -S --noconfirm zsh starship zsh-syntax-highlighting
+sudo pacman "${PACMAN_EXTRA_ARGS[@]}" -S --noconfirm zsh starship zsh-syntax-highlighting
 
 USER_NAME=$REAL_USER
 USER_HOME=$(getent passwd "$USER_NAME" | cut -d: -f6)
@@ -272,7 +277,7 @@ chown "$USER_NAME":"$(id -gn "$USER_NAME")" "$USER_HOME/.config/starship.toml"
 
 ### 8. Virtualization setup ###
     echo "Installing virtualization packages..."
-    sudo pacman -S --noconfirm libvirt virt-manager qemu-desktop dnsmasq dmidecode
+    sudo pacman "${PACMAN_EXTRA_ARGS[@]}" -S --noconfirm libvirt virt-manager qemu-desktop dnsmasq dmidecode
 
     echo "Enabling virtualization services..."
     sudo systemctl enable --now libvirtd.service virtlogd.service
